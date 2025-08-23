@@ -16,4 +16,6 @@ dependencies = [
     "sift-stack-py>=0.8.4",
     "streamlit>=1.48.1",
     "yt-dlp>=2025.8.20",
+    "google-cloud-speech>=2.33.0",
+    "ffmpeg>=1.4",
 ]

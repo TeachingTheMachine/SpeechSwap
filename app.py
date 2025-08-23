@@ -138,18 +138,24 @@ def process_video(video_source, tts_voice, speech_speed):
     # 2. Application Default Credentials (if using gcloud CLI)
     # 3. Automatic authentication when running on Google Cloud Platform
     
-    # We'll try to initialize the TTS generator which will handle authentication
+    # We'll try to initialize both TTS and audio processors for authentication
     try:
         test_tts = TTSGenerator()
+        test_audio = AudioUtils()
     except Exception as e:
-        st.error(f"❌ Google Cloud TTS authentication failed: {str(e)}")
-        st.info("""💡 **To set up Google Cloud TTS authentication:**
+        st.error(f"❌ Google Cloud authentication failed: {str(e)}")
+        st.info("""💡 **To set up Google Cloud authentication:**
         
-        1. Create a Google Cloud project and enable the Text-to-Speech API
-        2. Create a service account and download the JSON key file
-        3. Set the GOOGLE_APPLICATION_CREDENTIALS environment variable to point to your key file
+        1. Create a Google Cloud project
+        2. Enable Text-to-Speech API and Speech-to-Text API
+        3. Create a service account and download the JSON key file
+        4. Set the GOOGLE_APPLICATION_CREDENTIALS environment variable to point to your key file
         
         Or use gcloud CLI: `gcloud auth application-default login`
+        
+        **Free tier includes:**
+        - Text-to-Speech: 4 million characters per month
+        - Speech-to-Text: 60 minutes per month
         """)
         return
     

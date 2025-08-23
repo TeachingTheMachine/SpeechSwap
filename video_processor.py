@@ -1,7 +1,8 @@
 import os
 import tempfile
+import subprocess
 from pytube import YouTube
-import ffmpeg
+from pydub import AudioSegment
 import streamlit as st
 
 class VideoProcessor:
@@ -9,6 +10,17 @@ class VideoProcessor:
     
     def __init__(self):
         self.supported_formats = ['mp4', 'avi', 'mov', 'mkv', 'webm']
+    
+    def _get_duration(self, file_path):
+        """Get duration of a media file using ffprobe"""
+        cmd = [
+            'ffprobe', '-v', 'quiet', '-show_entries', 'format=duration',
+            '-of', 'csv=p=0', file_path
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode == 0:
+            return float(result.stdout.strip())
+        return 0
     
     def download_youtube_video(self, url, output_dir):
         """
@@ -55,7 +67,7 @@ class VideoProcessor:
     
     def replace_audio(self, video_path, new_audio_path, output_dir):
         """
-        Replace audio in video with new audio track using ffmpeg
+        Replace audio in video with new audio track using ffmpeg subprocess
         
         Args:
             video_path (str): Path to the original video
@@ -66,43 +78,42 @@ class VideoProcessor:
             str: Path to the output video with replaced audio
         """
         try:
-            # Get video duration using ffmpeg
-            video_info = ffmpeg.probe(video_path)
-            video_duration = float(video_info['streams'][0]['duration'])
-            
-            # Get audio duration using ffmpeg
-            audio_info = ffmpeg.probe(new_audio_path)
-            audio_duration = float(audio_info['streams'][0]['duration'])
+            # Get video duration using ffprobe subprocess
+            video_duration = self._get_duration(video_path)
+            audio_duration = self._get_duration(new_audio_path)
             
             # Output path
             output_path = os.path.join(output_dir, "output_video.mp4")
             
-            # Handle duration mismatch and combine video with new audio
-            video_input = ffmpeg.input(video_path)
-            audio_input = ffmpeg.input(new_audio_path)
+            # Build ffmpeg command to combine video with new audio
+            cmd = [
+                'ffmpeg', '-y',  # Overwrite output file
+                '-i', video_path,  # Input video
+                '-i', new_audio_path,  # Input audio
+                '-c:v', 'copy',  # Copy video stream
+                '-c:a', 'aac',   # Encode audio as AAC
+                '-map', '0:v:0',  # Map video from first input
+                '-map', '1:a:0',  # Map audio from second input
+            ]
             
+            # Handle duration mismatch
             if abs(audio_duration - video_duration) > 0.1:  # More than 0.1 second difference
                 if audio_duration > video_duration:
                     # Trim audio to match video duration
-                    audio_input = audio_input.filter('atrim', duration=video_duration)
+                    cmd.extend(['-t', str(video_duration)])
                     st.warning(f"⚠️ Audio was longer than video. Trimmed to {video_duration:.1f} seconds.")
                 else:
-                    # Extend audio to match video duration by looping
-                    audio_input = audio_input.filter('aloop', loop=-1, size=2e+09).filter('atrim', duration=video_duration)
+                    # Loop audio to match video duration
+                    cmd.extend(['-stream_loop', '-1', '-t', str(video_duration)])
                     st.warning(f"⚠️ Audio was shorter than video. Extended to {video_duration:.1f} seconds.")
             
-            # Combine video and audio
-            output = ffmpeg.output(
-                video_input.video,
-                audio_input.audio,
-                output_path,
-                vcodec='copy',  # Copy video stream without re-encoding
-                acodec='aac',   # Re-encode audio as AAC
-                strict='experimental'
-            )
+            cmd.append(output_path)
             
             # Run ffmpeg command
-            ffmpeg.run(output, overwrite_output=True, quiet=True)
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            
+            if result.returncode != 0:
+                raise Exception(f"FFmpeg failed: {result.stderr}")
             
             return output_path
             
@@ -111,7 +122,7 @@ class VideoProcessor:
     
     def get_video_info(self, video_path):
         """
-        Get basic information about a video file using ffmpeg
+        Get basic information about a video file using ffprobe subprocess
         
         Args:
             video_path (str): Path to the video file
@@ -120,13 +131,25 @@ class VideoProcessor:
             dict: Video information including duration, fps, resolution
         """
         try:
-            probe = ffmpeg.probe(video_path)
+            # Use ffprobe to get video information
+            cmd = [
+                'ffprobe', '-v', 'quiet', '-print_format', 'json',
+                '-show_format', '-show_streams', video_path
+            ]
             
-            video_stream = next((stream for stream in probe['streams'] if stream['codec_type'] == 'video'), None)
-            audio_stream = next((stream for stream in probe['streams'] if stream['codec_type'] == 'audio'), None)
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            
+            if result.returncode != 0:
+                raise Exception(f"FFprobe failed: {result.stderr}")
+            
+            import json
+            probe_data = json.loads(result.stdout)
+            
+            video_stream = next((stream for stream in probe_data['streams'] if stream['codec_type'] == 'video'), None)
+            audio_stream = next((stream for stream in probe_data['streams'] if stream['codec_type'] == 'audio'), None)
             
             info = {
-                'duration': float(probe['format']['duration']) if 'duration' in probe['format'] else 0,
+                'duration': float(probe_data['format']['duration']) if 'duration' in probe_data['format'] else 0,
                 'fps': eval(video_stream['r_frame_rate']) if video_stream and 'r_frame_rate' in video_stream else 0,
                 'size': (int(video_stream['width']), int(video_stream['height'])) if video_stream else (0, 0),
                 'has_audio': audio_stream is not None

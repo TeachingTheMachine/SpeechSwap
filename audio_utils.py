@@ -1,23 +1,23 @@
 import os
 import tempfile
-import ffmpeg
+import subprocess
 from pydub import AudioSegment
-from openai import OpenAI
+from google.cloud import speech
 
 class AudioUtils:
     """Handles audio extraction and processing operations"""
     
     def __init__(self):
-        # Initialize OpenAI client
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise ValueError("OpenAI API key not found in environment variables")
-        
-        self.openai_client = OpenAI(api_key=api_key)
+        # Initialize Google Cloud Speech client
+        # Google Cloud authentication can be done via:
+        # 1. Service account key file (GOOGLE_APPLICATION_CREDENTIALS env var)
+        # 2. Application Default Credentials (gcloud auth application-default login)
+        # 3. Or automatic if running on Google Cloud
+        self.speech_client = speech.SpeechClient()
     
     def extract_audio(self, video_path, output_dir):
         """
-        Extract audio from video file using ffmpeg
+        Extract audio from video file using ffmpeg subprocess
         
         Args:
             video_path (str): Path to the video file
@@ -27,23 +27,35 @@ class AudioUtils:
             str: Path to the extracted audio file
         """
         try:
-            # Check if video has audio stream
-            probe = ffmpeg.probe(video_path)
-            audio_stream = next((stream for stream in probe['streams'] if stream['codec_type'] == 'audio'), None)
+            # Check if video has audio stream using ffprobe
+            probe_cmd = [
+                'ffprobe', '-v', 'quiet', '-select_streams', 'a:0',
+                '-show_entries', 'stream=codec_type', '-of', 'csv=p=0', video_path
+            ]
             
-            if not audio_stream:
+            probe_result = subprocess.run(probe_cmd, capture_output=True, text=True)
+            
+            if probe_result.returncode != 0 or 'audio' not in probe_result.stdout:
                 raise Exception("Video file has no audio track")
             
             # Output path
             audio_path = os.path.join(output_dir, "extracted_audio.wav")
             
-            # Extract audio using ffmpeg
-            (
-                ffmpeg
-                .input(video_path)
-                .output(audio_path, acodec='pcm_s16le', ac=1, ar='16000')  # 16kHz mono for better whisper compatibility
-                .run(overwrite_output=True, quiet=True)
-            )
+            # Extract audio using ffmpeg subprocess
+            extract_cmd = [
+                'ffmpeg', '-y',  # Overwrite output
+                '-i', video_path,  # Input video
+                '-vn',  # No video
+                '-acodec', 'pcm_s16le',  # 16-bit PCM
+                '-ac', '1',  # Mono
+                '-ar', '16000',  # 16kHz sample rate for speech recognition
+                audio_path
+            ]
+            
+            result = subprocess.run(extract_cmd, capture_output=True, text=True)
+            
+            if result.returncode != 0:
+                raise Exception(f"FFmpeg failed: {result.stderr}")
             
             return audio_path
             
@@ -52,7 +64,7 @@ class AudioUtils:
     
     def transcribe_audio(self, audio_path):
         """
-        Transcribe audio using OpenAI Whisper
+        Transcribe audio using Google Cloud Speech-to-Text
         
         Args:
             audio_path (str): Path to the audio file
@@ -61,32 +73,50 @@ class AudioUtils:
             str: Transcribed text
         """
         try:
-            # Convert audio to format suitable for Whisper if needed
-            processed_audio_path = self._prepare_audio_for_whisper(audio_path)
+            # Convert audio to format suitable for Google Speech-to-Text if needed
+            processed_audio_path = self._prepare_audio_for_speech_api(audio_path)
             
-            # Transcribe using OpenAI Whisper
+            # Read the audio file
             with open(processed_audio_path, "rb") as audio_file:
-                # the newest OpenAI model is "gpt-4o" which was released May 13, 2024.
-                # do not change this unless explicitly requested by the user
-                response = self.openai_client.audio.transcriptions.create(
-                    model="whisper-1",
-                    file=audio_file,
-                    response_format="text"
-                )
+                content = audio_file.read()
+            
+            # Configure recognition
+            audio = speech.RecognitionAudio(content=content)
+            config = speech.RecognitionConfig(
+                encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
+                sample_rate_hertz=16000,
+                language_code="en-US",
+                # Enable automatic punctuation and word confidence
+                enable_automatic_punctuation=True,
+                # Use enhanced model for better accuracy
+                use_enhanced=True,
+                # Alternative: use latest long-running recognition for longer audio
+                model="latest_long"
+            )
+            
+            # Perform the transcription
+            response = self.speech_client.recognize(config=config, audio=audio)
+            
+            # Combine all transcription results
+            transcript_parts = []
+            for result in response.results:
+                transcript_parts.append(result.alternatives[0].transcript)
+            
+            transcript = " ".join(transcript_parts)
             
             # Clean up processed audio file if it's different from original
             if processed_audio_path != audio_path:
                 os.remove(processed_audio_path)
             
-            return response.strip()
+            return transcript.strip()
             
         except Exception as e:
             raise Exception(f"Failed to transcribe audio: {str(e)}")
     
-    def _prepare_audio_for_whisper(self, audio_path):
+    def _prepare_audio_for_speech_api(self, audio_path):
         """
-        Prepare audio file for Whisper transcription
-        Whisper works best with certain formats and sample rates
+        Prepare audio file for Google Cloud Speech-to-Text transcription
+        Google Speech-to-Text works best with specific formats and sample rates
         
         Args:
             audio_path (str): Path to the original audio file
@@ -102,23 +132,23 @@ class AudioUtils:
             if audio.channels > 1:
                 audio = audio.set_channels(1)
             
-            # Set sample rate to 16kHz (good for speech recognition)
+            # Set sample rate to 16kHz (required for Google Speech-to-Text)
             audio = audio.set_frame_rate(16000)
             
-            # Limit file size for API (max 25MB for Whisper)
-            # If file is too long, we might need to chunk it
-            max_duration_ms = 10 * 60 * 1000  # 10 minutes in milliseconds
+            # Limit file size for API (max 10MB for synchronous recognition)
+            # If file is too long, we might need to use asynchronous recognition
+            max_duration_ms = 5 * 60 * 1000  # 5 minutes in milliseconds for sync API
             
             if len(audio) > max_duration_ms:
                 audio = audio[:max_duration_ms]
                 import streamlit as st
-                st.warning("⚠️ Audio was truncated to 10 minutes for transcription.")
+                st.warning("⚠️ Audio was truncated to 5 minutes for transcription.")
             
-            # Export as MP3 for Whisper
+            # Export as WAV for Google Speech-to-Text (LINEAR16 encoding)
             output_dir = os.path.dirname(audio_path)
-            processed_path = os.path.join(output_dir, "whisper_audio.mp3")
+            processed_path = os.path.join(output_dir, "speech_audio.wav")
             
-            audio.export(processed_path, format="mp3", bitrate="64k")
+            audio.export(processed_path, format="wav")
             
             return processed_path
             
