@@ -1,7 +1,7 @@
 import os
 import tempfile
 from pytube import YouTube
-from moviepy.editor import VideoFileClip, AudioFileClip
+import ffmpeg
 import streamlit as st
 
 class VideoProcessor:
@@ -55,7 +55,7 @@ class VideoProcessor:
     
     def replace_audio(self, video_path, new_audio_path, output_dir):
         """
-        Replace audio in video with new audio track
+        Replace audio in video with new audio track using ffmpeg
         
         Args:
             video_path (str): Path to the original video
@@ -66,53 +66,43 @@ class VideoProcessor:
             str: Path to the output video with replaced audio
         """
         try:
-            # Load video and audio clips
-            video_clip = VideoFileClip(video_path)
-            new_audio_clip = AudioFileClip(new_audio_path)
+            # Get video duration using ffmpeg
+            video_info = ffmpeg.probe(video_path)
+            video_duration = float(video_info['streams'][0]['duration'])
             
-            # Get video duration
-            video_duration = video_clip.duration
-            audio_duration = new_audio_clip.duration
-            
-            # Handle duration mismatch
-            if audio_duration > video_duration:
-                # Trim audio to match video duration
-                new_audio_clip = new_audio_clip.subclip(0, video_duration)
-                st.warning(f"⚠️ Audio was longer than video. Trimmed to {video_duration:.1f} seconds.")
-            elif audio_duration < video_duration:
-                # Extend audio by repeating or padding with silence
-                loops_needed = int(video_duration / audio_duration) + 1
-                extended_audio = new_audio_clip
-                
-                for _ in range(loops_needed - 1):
-                    extended_audio = extended_audio.concatenate_audioclip(new_audio_clip)
-                
-                # Trim to exact video duration
-                extended_audio = extended_audio.subclip(0, video_duration)
-                new_audio_clip = extended_audio
-                st.warning(f"⚠️ Audio was shorter than video. Extended to {video_duration:.1f} seconds.")
-            
-            # Set the new audio to the video
-            final_video = video_clip.set_audio(new_audio_clip)
+            # Get audio duration using ffmpeg
+            audio_info = ffmpeg.probe(new_audio_path)
+            audio_duration = float(audio_info['streams'][0]['duration'])
             
             # Output path
             output_path = os.path.join(output_dir, "output_video.mp4")
             
-            # Write the final video
-            final_video.write_videofile(
+            # Handle duration mismatch and combine video with new audio
+            video_input = ffmpeg.input(video_path)
+            audio_input = ffmpeg.input(new_audio_path)
+            
+            if abs(audio_duration - video_duration) > 0.1:  # More than 0.1 second difference
+                if audio_duration > video_duration:
+                    # Trim audio to match video duration
+                    audio_input = audio_input.filter('atrim', duration=video_duration)
+                    st.warning(f"⚠️ Audio was longer than video. Trimmed to {video_duration:.1f} seconds.")
+                else:
+                    # Extend audio to match video duration by looping
+                    audio_input = audio_input.filter('aloop', loop=-1, size=2e+09).filter('atrim', duration=video_duration)
+                    st.warning(f"⚠️ Audio was shorter than video. Extended to {video_duration:.1f} seconds.")
+            
+            # Combine video and audio
+            output = ffmpeg.output(
+                video_input.video,
+                audio_input.audio,
                 output_path,
-                codec='libx264',
-                audio_codec='aac',
-                temp_audiofile=os.path.join(output_dir, 'temp_audio.m4a'),
-                remove_temp=True,
-                verbose=False,
-                logger=None  # Suppress moviepy logs
+                vcodec='copy',  # Copy video stream without re-encoding
+                acodec='aac',   # Re-encode audio as AAC
+                strict='experimental'
             )
             
-            # Clean up clips
-            video_clip.close()
-            new_audio_clip.close()
-            final_video.close()
+            # Run ffmpeg command
+            ffmpeg.run(output, overwrite_output=True, quiet=True)
             
             return output_path
             
@@ -121,7 +111,7 @@ class VideoProcessor:
     
     def get_video_info(self, video_path):
         """
-        Get basic information about a video file
+        Get basic information about a video file using ffmpeg
         
         Args:
             video_path (str): Path to the video file
@@ -130,16 +120,18 @@ class VideoProcessor:
             dict: Video information including duration, fps, resolution
         """
         try:
-            clip = VideoFileClip(video_path)
+            probe = ffmpeg.probe(video_path)
+            
+            video_stream = next((stream for stream in probe['streams'] if stream['codec_type'] == 'video'), None)
+            audio_stream = next((stream for stream in probe['streams'] if stream['codec_type'] == 'audio'), None)
             
             info = {
-                'duration': clip.duration,
-                'fps': clip.fps,
-                'size': clip.size,
-                'has_audio': clip.audio is not None
+                'duration': float(probe['format']['duration']) if 'duration' in probe['format'] else 0,
+                'fps': eval(video_stream['r_frame_rate']) if video_stream and 'r_frame_rate' in video_stream else 0,
+                'size': (int(video_stream['width']), int(video_stream['height'])) if video_stream else (0, 0),
+                'has_audio': audio_stream is not None
             }
             
-            clip.close()
             return info
             
         except Exception as e:

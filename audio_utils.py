@@ -1,6 +1,6 @@
 import os
 import tempfile
-from moviepy.editor import VideoFileClip
+import ffmpeg
 from pydub import AudioSegment
 from openai import OpenAI
 
@@ -17,7 +17,7 @@ class AudioUtils:
     
     def extract_audio(self, video_path, output_dir):
         """
-        Extract audio from video file
+        Extract audio from video file using ffmpeg
         
         Args:
             video_path (str): Path to the video file
@@ -27,28 +27,23 @@ class AudioUtils:
             str: Path to the extracted audio file
         """
         try:
-            # Load video clip
-            video_clip = VideoFileClip(video_path)
+            # Check if video has audio stream
+            probe = ffmpeg.probe(video_path)
+            audio_stream = next((stream for stream in probe['streams'] if stream['codec_type'] == 'audio'), None)
             
-            if not video_clip.audio:
+            if not audio_stream:
                 raise Exception("Video file has no audio track")
-            
-            # Extract audio
-            audio_clip = video_clip.audio
             
             # Output path
             audio_path = os.path.join(output_dir, "extracted_audio.wav")
             
-            # Write audio file
-            audio_clip.write_audiofile(
-                audio_path,
-                verbose=False,
-                logger=None  # Suppress moviepy logs
+            # Extract audio using ffmpeg
+            (
+                ffmpeg
+                .input(video_path)
+                .output(audio_path, acodec='pcm_s16le', ac=1, ar='16000')  # 16kHz mono for better whisper compatibility
+                .run(overwrite_output=True, quiet=True)
             )
-            
-            # Clean up clips
-            audio_clip.close()
-            video_clip.close()
             
             return audio_path
             
