@@ -6,7 +6,7 @@ from pathlib import Path
 import traceback
 
 from video_processor import VideoProcessor
-from basic_tts_generator import BasicTTSGenerator
+from coqui_tts_generator import CoquiTTSGenerator
 
 # Configure page
 st.set_page_config(
@@ -39,13 +39,13 @@ def main():
     # Sidebar for settings
     st.sidebar.header("Settings")
     
-    # TTS Voice selection (simplified for gTTS)
+    # TTS Voice selection (Coqui TTS voices)
     voice_options = {
-        "en": "English",
-        "en-us": "English (US)", 
-        "en-uk": "English (UK)",
-        "en-au": "English (Australia)",
-        "en-ca": "English (Canada)"
+        "en_female": "English (Female, High Quality)",
+        "en_male": "English (Male, High Quality)", 
+        "en_multi": "English (Multi-Speaker)",
+        "en_fast": "English (Fast Mode)",
+        "en_emotional": "English (Emotional)"
     }
     
     tts_voice = st.sidebar.selectbox(
@@ -147,7 +147,7 @@ def process_video_manual(uploaded_video, manual_text, tts_voice, speech_speed):
     try:
         # Initialize processors
         video_processor = VideoProcessor()
-        tts_generator = BasicTTSGenerator()
+        tts_generator = CoquiTTSGenerator()
         
         with progress_container:
             # Step 1: Save uploaded video

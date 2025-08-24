@@ -2,7 +2,7 @@ modules = ["python-3.11"]
 
 [nix]
 channel = "stable-25_05"
-packages = ["espeak-ng", "ffmpeg", "ffmpeg-full", "imagemagickBig", "libGL", "pkg-config"]
+packages = ["espeak-ng", "ffmpeg", "ffmpeg-full", "imagemagickBig", "libGL", "libsndfile", "pkg-config"]
 
 [deployment]
 deploymentTarget = "autoscale"
