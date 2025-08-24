@@ -1,21 +1,23 @@
 [project]
-name = "repl-nix-workspace"
-version = "0.1.0"
-description = "Add your description here"
+name = "youtube-voice-replacement"
+version = "0.2.0"
+description = "Replace YouTube video audio with AI-generated TTS speech"
 requires-python = ">=3.11"
 dependencies = [
     "decorator==4.4.2",
     "ffmpeg-python>=0.2.0",
     "google-cloud-texttospeech>=2.27.0",
+    "google-cloud-speech>=2.33.0",
     "imageio-ffmpeg>=0.6.0",
     "imageio==2.34.0",
     "moviepy>=2.2.1",
-    "openai>=1.101.0",
     "pydub>=0.25.1",
-    "pytube>=15.0.0",
-    "sift-stack-py>=0.8.4",
     "streamlit>=1.48.1",
     "yt-dlp>=2025.8.20",
-    "google-cloud-speech>=2.33.0",
+    "youtube-transcript-api>=3.2.1",
     "ffmpeg>=1.4",
 ]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
