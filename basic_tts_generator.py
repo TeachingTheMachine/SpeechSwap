@@ -5,24 +5,27 @@ from pydub import AudioSegment
 import re
 
 class BasicTTSGenerator:
-    """Basic text-to-speech using system tools (no external packages required)"""
+    """Google Text-to-Speech generator with fallback options"""
     
     def __init__(self):
-        # Available basic options
+        # Available Google TTS voices
         self.available_voices = {
-            "en": "English (Basic)",
-            "espeak": "eSpeak Synthesizer",
-            "festival": "Festival TTS"
+            "en": "English (US)",
+            "en-us": "English (US)", 
+            "en-uk": "English (UK)",
+            "en-au": "English (Australia)",
+            "en-ca": "English (Canada)",
+            "en-in": "English (India)"
         }
     
     def generate_speech(self, text, output_dir, voice="en", speed=1.0):
         """
-        Generate speech from text using available system TTS
+        Generate speech from text using Google TTS with fallback options
         
         Args:
             text (str): Text to convert to speech
             output_dir (str): Directory to save the audio file
-            voice (str): Voice type
+            voice (str): Voice language code
             speed (float): Speed of speech
             
         Returns:
@@ -35,19 +38,77 @@ class BasicTTSGenerator:
             if not cleaned_text.strip():
                 raise Exception("No valid text found for TTS generation")
             
-            # Try different TTS methods
-            final_audio_path = os.path.join(output_dir, "tts_audio.wav")
+            final_audio_path = os.path.join(output_dir, "tts_audio.mp3")
             
-            # Method 1: Try espeak if available
-            if self._try_espeak(cleaned_text, final_audio_path, speed):
+            # Method 1: Try Google TTS (gTTS)
+            if self._try_gtts(cleaned_text, final_audio_path, voice, speed):
                 return final_audio_path
             
-            # Method 2: Create a simple audio file with text information
-            # This creates a simple tone so we can at least test the pipeline
-            return self._create_placeholder_audio(cleaned_text, final_audio_path)
+            # Method 2: Try espeak as fallback
+            wav_path = os.path.join(output_dir, "tts_audio.wav")
+            if self._try_espeak(cleaned_text, wav_path, speed):
+                return wav_path
+            
+            # Method 3: Create placeholder audio for testing
+            return self._create_placeholder_audio(cleaned_text, wav_path)
             
         except Exception as e:
             raise Exception(f"Failed to generate TTS audio: {str(e)}")
+    
+    def _try_gtts(self, text, output_path, voice, speed):
+        """Try to use Google Text-to-Speech (gTTS)"""
+        try:
+            # Try to import and use gTTS
+            from gtts import gTTS
+            import io
+            
+            # Create gTTS object
+            tts = gTTS(text=text, lang=voice.split('-')[0], slow=(speed < 0.8))
+            
+            # Save to file
+            tts.save(output_path)
+            
+            # Apply speed adjustment if needed using ffmpeg
+            if speed != 1.0 and speed != 0.8:
+                self._adjust_audio_speed_ffmpeg(output_path, speed)
+            
+            if os.path.exists(output_path):
+                print(f"Google TTS generated successfully: {output_path}")
+                return True
+            
+            return False
+            
+        except ImportError:
+            print("gTTS not available, trying fallback methods")
+            return False
+        except Exception as e:
+            print(f"Google TTS generation failed: {e}")
+            return False
+    
+    def _adjust_audio_speed_ffmpeg(self, audio_path, speed):
+        """Adjust audio speed using ffmpeg"""
+        try:
+            temp_path = audio_path.replace('.mp3', '_temp.mp3')
+            
+            cmd = [
+                'ffmpeg', '-y',
+                '-i', audio_path,
+                '-filter:a', f'atempo={speed}',
+                temp_path
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            
+            if result.returncode == 0:
+                # Replace original with adjusted version
+                os.replace(temp_path, audio_path)
+            else:
+                # Clean up temp file if it exists
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+                    
+        except Exception as e:
+            print(f"Speed adjustment failed: {e}")
     
     def _try_espeak(self, text, output_path, speed):
         """Try to use espeak for TTS"""
