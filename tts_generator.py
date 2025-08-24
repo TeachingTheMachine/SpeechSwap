@@ -1,26 +1,44 @@
 """
-Author: Vanessa Crosby
-Date: August 23, 2025
-File: tts_generator.py
-Summary: Google Cloud Text-to-Speech generator with voice options and text processing
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                              tts_generator.py                               ║
+║                                                                              ║
+║  Author: Vanessa Crosby                                                      ║
+║  Date Created: August 23, 2025                                              ║
+║  File Purpose: Google Cloud Text-to-Speech generator with voice options     ║
+║  Date Modified: August 23, 2025 4:30 PM                                     ║
+║  Mod Purpose: Added length control and safe Replit authentication           ║
+╚══════════════════════════════════════════════════════════════════════════════╝
 """
+
+# ═══════════════════════════════════════════════════════════════════════════
+# LENGTH CONTROL SETTING
+# ═══════════════════════════════════════════════════════════════════════════
+# Set to number of words to limit transcript (for testing/cost control)
+# Set to None or 0 for full transcript
+MAX_WORDS = 25  # Change this to None for full transcript
+# ═══════════════════════════════════════════════════════════════════════════
 
 import os
 import tempfile
+import json
 from google.cloud import texttospeech
 from pydub import AudioSegment
 import re
+import streamlit as st
 
 class TTSGenerator:
     """Handles text-to-speech generation using Google Cloud TTS"""
 
     def __init__(self):
+        # Set up Google Cloud credentials safely
+        self._setup_credentials()
+
         # Initialize Google Cloud TTS client
-        # Google Cloud authentication can be done via:
-        # 1. Service account key file (GOOGLE_APPLICATION_CREDENTIALS env var)
-        # 2. Application Default Credentials (gcloud auth application-default login)
-        # 3. Or automatic if running on Google Cloud
-        self.client = texttospeech.TextToSpeechClient()
+        try:
+            self.client = texttospeech.TextToSpeechClient()
+            st.success("✅ Google Cloud TTS initialized successfully!")
+        except Exception as e:
+            raise Exception(f"Failed to initialize Google Cloud TTS: {str(e)}")
 
         # Available voices with language codes
         self.available_voices = {
@@ -33,6 +51,44 @@ class TTSGenerator:
             "en-US-Neural2-D": "Neural Male voice (US English)",
             "en-US-Neural2-F": "Neural Female voice (US English)"
         }
+
+    def _setup_credentials(self):
+        """Set up Google Cloud credentials from Replit secrets"""
+        try:
+            # Get the JSON content from Replit secrets
+            credentials_json = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS_JSON')
+
+            if not credentials_json:
+                raise Exception("GOOGLE_APPLICATION_CREDENTIALS_JSON not found in environment variables")
+
+            # Create a temporary file for the credentials
+            self.temp_creds_file = tempfile.NamedTemporaryFile(
+                mode='w', 
+                suffix='.json', 
+                delete=False
+            )
+
+            # Write the credentials to the temporary file
+            self.temp_creds_file.write(credentials_json)
+            self.temp_creds_file.close()
+
+            # Set the environment variable to point to the temp file
+            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = self.temp_creds_file.name
+
+            # Verify the JSON is valid
+            with open(self.temp_creds_file.name, 'r') as f:
+                json.load(f)  # This will raise an exception if invalid JSON
+
+        except Exception as e:
+            raise Exception(f"Failed to set up Google credentials: {str(e)}")
+
+    def __del__(self):
+        """Clean up credentials file when object is destroyed"""
+        try:
+            if hasattr(self, 'temp_creds_file') and os.path.exists(self.temp_creds_file.name):
+                os.unlink(self.temp_creds_file.name)
+        except:
+            pass
 
     def generate_speech(self, text, output_dir, voice="en-US-Standard-A", speed=1.0):
         """
@@ -59,6 +115,21 @@ class TTSGenerator:
 
             if not cleaned_text.strip():
                 raise Exception("No valid text found for TTS generation")
+
+            # Apply length limit if set
+            if MAX_WORDS and MAX_WORDS > 0:
+                words = cleaned_text.split()
+                if len(words) > MAX_WORDS:
+                    limited_words = words[:MAX_WORDS]
+                    cleaned_text = ' '.join(limited_words) + "..."
+
+                    st.warning(f"🧪 **Length Limited**: Using first {MAX_WORDS} words to control costs")
+                    st.info(f"💡 **Preview**: {cleaned_text}")
+
+                    # Show cost estimate
+                    char_count = len(cleaned_text)
+                    estimated_cost = (char_count / 1000000) * 16
+                    st.success(f"💰 **Estimated cost**: ${estimated_cost:.6f}")
 
             # Split text into chunks if too long (Google TTS has character limits)
             text_chunks = self._split_text_into_chunks(cleaned_text, max_chunk_size=5000)
@@ -128,11 +199,12 @@ class TTSGenerator:
             )
 
             # Perform the text-to-speech request
-            response = self.client.synthesize_speech(
-                input=synthesis_input,
-                voice=voice_params,
-                audio_config=audio_config
-            )
+            with st.spinner("Calling Google Cloud TTS API..."):
+                response = self.client.synthesize_speech(
+                    input=synthesis_input,
+                    voice=voice_params,
+                    audio_config=audio_config
+                )
 
             # Save audio chunk
             chunk_path = os.path.join(output_dir, f"tts_chunk_{chunk_index}.mp3")
