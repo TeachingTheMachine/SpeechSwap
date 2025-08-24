@@ -39,14 +39,16 @@ def main():
     # Sidebar for settings
     st.sidebar.header("Settings")
     
-    # TTS Voice selection (Google TTS voices)
+    # TTS Voice selection (Google Cloud TTS voices)
     voice_options = {
-        "en": "English (US)",
-        "en-us": "English (US)", 
-        "en-uk": "English (UK)",
-        "en-au": "English (Australia)",
-        "en-ca": "English (Canada)",
-        "en-in": "English (India)"
+        "en-US-Wavenet-D": "English US (Male, Natural)",
+        "en-US-Wavenet-F": "English US (Female, Natural)", 
+        "en-GB-Wavenet-A": "English UK (Female, Natural)",
+        "en-GB-Wavenet-B": "English UK (Male, Natural)",
+        "en-AU-Wavenet-A": "English Australia (Female, Natural)",
+        "en-AU-Wavenet-B": "English Australia (Male, Natural)",
+        "en-CA-Wavenet-A": "English Canada (Female, Natural)",
+        "en-CA-Wavenet-B": "English Canada (Male, Natural)"
     }
     
     tts_voice = st.sidebar.selectbox(

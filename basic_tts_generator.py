@@ -2,37 +2,42 @@ import os
 import tempfile
 import subprocess
 import re
+import base64
 
 class BasicTTSGenerator:
-    """Google Text-to-Speech generator using gTTS"""
+    """Google Cloud Text-to-Speech generator using Google Cloud TTS API"""
     
     def __init__(self):
-        # Check if gTTS is available
+        # Check if Google Cloud TTS is available
         try:
-            import gtts
-            self.gtts_available = True
-        except ImportError:
-            self.gtts_available = False
-            print("Warning: gTTS package not available. Please install it for Google TTS functionality.")
+            from google.cloud import texttospeech
+            self.tts_client = texttospeech.TextToSpeechClient()
+            self.google_tts_available = True
+            print("Google Cloud TTS initialized successfully")
+        except Exception as e:
+            self.google_tts_available = False
+            print(f"Google Cloud TTS not available: {e}")
         
-        # Available Google TTS voices
+        # Available Google Cloud TTS voices
         self.available_voices = {
-            "en": "English (US)",
-            "en-us": "English (US)", 
-            "en-uk": "English (UK)",
-            "en-au": "English (Australia)",
-            "en-ca": "English (Canada)",
-            "en-in": "English (India)"
+            "en-US-Wavenet-D": "English US (Male, Natural)",
+            "en-US-Wavenet-F": "English US (Female, Natural)", 
+            "en-GB-Wavenet-A": "English UK (Female, Natural)",
+            "en-GB-Wavenet-B": "English UK (Male, Natural)",
+            "en-AU-Wavenet-A": "English Australia (Female, Natural)",
+            "en-AU-Wavenet-B": "English Australia (Male, Natural)",
+            "en-CA-Wavenet-A": "English Canada (Female, Natural)",
+            "en-CA-Wavenet-B": "English Canada (Male, Natural)"
         }
     
-    def generate_speech(self, text, output_dir, voice="en", speed=1.0):
+    def generate_speech(self, text, output_dir, voice="en-US-Wavenet-F", speed=1.0):
         """
-        Generate speech from text using Google TTS
+        Generate speech from text using Google Cloud TTS API
         
         Args:
             text (str): Text to convert to speech
             output_dir (str): Directory to save the audio file
-            voice (str): Voice language code
+            voice (str): Voice name from Google Cloud TTS
             speed (float): Speed of speech
             
         Returns:
@@ -47,52 +52,53 @@ class BasicTTSGenerator:
             
             output_path = os.path.join(output_dir, "tts_audio.mp3")
             
-            # Check if gTTS is available
-            if not self.gtts_available:
-                raise Exception("gTTS package is not available. Please install it to use Google TTS.")
+            # Check if Google Cloud TTS is available
+            if not self.google_tts_available:
+                raise Exception("Google Cloud TTS is not available. Please set up Google Cloud credentials.")
             
-            # Import gTTS here after checking availability
-            from gtts import gTTS
+            # Use Google Cloud TTS API
+            from google.cloud import texttospeech
             
-            # Use Google TTS
-            lang_code = voice.split('-')[0]  # Extract language code (e.g., 'en' from 'en-us')
-            slow_speech = speed < 0.8
+            # Ensure voice is valid
+            if voice not in self.available_voices:
+                voice = "en-US-Wavenet-F"  # Default to female US English
             
-            # Create gTTS object and generate speech
-            tts = gTTS(text=cleaned_text, lang=lang_code, slow=slow_speech)
-            tts.save(output_path)
+            # Set up synthesis input
+            synthesis_input = texttospeech.SynthesisInput(text=cleaned_text)
             
-            # Apply speed adjustment if needed
-            if speed != 1.0 and speed >= 0.8:
-                self._adjust_audio_speed(output_path, speed)
+            # Parse voice name to get language and voice name
+            language_code = '-'.join(voice.split('-')[:2])  # e.g., "en-US" from "en-US-Wavenet-F"
+            voice_name = voice
             
+            # Build the voice selection
+            voice_selection = texttospeech.VoiceSelectionParams(
+                language_code=language_code,
+                name=voice_name
+            )
+            
+            # Select the type of audio file to return
+            audio_config = texttospeech.AudioConfig(
+                audio_encoding=texttospeech.AudioEncoding.MP3,
+                speaking_rate=speed
+            )
+            
+            # Perform the text-to-speech request
+            response = self.tts_client.synthesize_speech(
+                input=synthesis_input,
+                voice=voice_selection,
+                audio_config=audio_config
+            )
+            
+            # Write the response to the output file
+            with open(output_path, "wb") as out:
+                out.write(response.audio_content)
+                
+            print(f"Google Cloud TTS audio generated successfully: {output_path}")
             return output_path
             
         except Exception as e:
-            raise Exception(f"Failed to generate Google TTS audio: {str(e)}")
+            raise Exception(f"Failed to generate Google Cloud TTS audio: {str(e)}")
     
-    def _adjust_audio_speed(self, audio_path, speed):
-        """Adjust audio speed using ffmpeg"""
-        try:
-            temp_path = audio_path.replace('.mp3', '_temp.mp3')
-            
-            cmd = [
-                'ffmpeg', '-y',
-                '-i', audio_path,
-                '-filter:a', f'atempo={speed}',
-                temp_path
-            ]
-            
-            result = subprocess.run(cmd, capture_output=True, text=True)
-            
-            if result.returncode == 0:
-                os.replace(temp_path, audio_path)
-            else:
-                if os.path.exists(temp_path):
-                    os.remove(temp_path)
-                    
-        except Exception as e:
-            print(f"Speed adjustment failed: {e}")
     
     
     def _clean_text_for_tts(self, text):
