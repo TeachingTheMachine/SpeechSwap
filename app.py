@@ -19,7 +19,7 @@ import traceback
 
 from video_processor import VideoProcessor
 from audio_utils import AudioUtils
-from tts_generator import TTSGenerator
+from simple_tts_generator import SimpleTTSGenerator
 
 st.set_page_config(page_title="YouTube Voice Replacement", page_icon="🎬", layout="wide")
 
