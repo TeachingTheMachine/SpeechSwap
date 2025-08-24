@@ -98,9 +98,20 @@ def main():
     with col2:
         st.header("Process")
         
+        # Show what's needed
+        if not uploaded_video:
+            st.warning("⚠️ Please upload a video file first")
+        elif not manual_text:
+            st.warning("⚠️ Please enter text to convert to speech")
+        else:
+            st.success("✅ Ready to process!")
+        
+        # Show button state clearly
         if uploaded_video and manual_text:
             if st.button("🚀 Start Processing", type="primary", use_container_width=True):
                 process_video_manual(uploaded_video, manual_text, tts_voice, speech_speed)
+        else:
+            st.button("🚀 Start Processing", type="primary", use_container_width=True, disabled=True, help="Upload video and enter text first")
         
         if st.session_state.processing_complete and st.session_state.output_video_path:
             st.success("✅ Processing Complete!")
