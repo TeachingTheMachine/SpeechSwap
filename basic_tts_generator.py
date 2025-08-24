@@ -9,7 +9,7 @@ class BasicTTSGenerator:
     def __init__(self):
         # Check if gTTS is available
         try:
-            from gtts import gTTS
+            import gtts
             self.gtts_available = True
         except ImportError:
             self.gtts_available = False
