@@ -32,8 +32,8 @@ def cleanup_temp_files():
 def main():
     st.title("🎬 YouTube Voice Replacement - Simple Version")
     st.markdown("""
-    Replace video audio with AI-generated speech using **gTTS (Google Text-to-Speech)**.
-    No authentication required - completely free to use!
+    Replace video audio with AI-generated speech using **Google Cloud Text-to-Speech**.
+    Paste your text and choose from high-quality voices to replace the video's audio.
     """)
     
     # Sidebar for settings
