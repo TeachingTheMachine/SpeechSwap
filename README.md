@@ -1,129 +1,184 @@
 # Video SpeechSwap 🎬
+*Results: Professional audio quality with functional synchronization. Lip sync accuracy is limited and requires improvement.*
 
 > **Note: Audio synchronization is functional but not perfect - lip sync accuracy could be improved and we welcome contributors to help solve this challenge.**
 
-**Video SpeechSwap** is an AI-powered video audio replacement system that transforms any video by swapping out the original audio with crystal-clear AI-generated speech. Originally built by someone who got tired of rewind tech videos becuase of my own inability to filter through accents (no offense to anyone - accents are beautiful! Some just throw my brain for a loop.), this application creates semi- synchronized videos with narration to help with clarity and understanding.
+**Video SpeechSwap** is an AI-powered video audio replacement system that transforms any video by replacing the original audio with clear AI-generated speech. Originally built to address comprehension challenges with accented speech in coding tutorials, this application creates synchronized videos with professional narration for improved accessibility and understand.
 
 ## What It Solves 📝
 
-Ever tried learning React from a tutorial where you spent more time rewinding than coding? Or attempted to follow along with a Python guide and that made you question your entire programming career? This system tackles the universal developer struggle of accent barriers in technical content. Whether you're wrestling with pronunciation mysteries in educational videos, dealing with audio that sounds like it was recorded in a wind tunnel, or just need clearer speech for better learning absorption, Video SpeechSwap turns "what did they just say?" moments into "oh, that actually makes sense!" experiences.
+This system addresses comprehension challenges in technical content where accent barriers, poor audio quality, or unclear speech patterns impede learning. Video SpeechSwap replaces original audio with clear, standardized narration, making educational content more accessible for effective learning.
 
 ## How It Works 🤝
 
-The system uses a surprisingly sophisticated pipeline to work its audio magic:
-- **Video Intake**: Accepts your uploaded victims (video files) or YouTube URLs for processing
-- **Text Wrangling**: Primarily relies on you pasting text (because let's be honest, auto-transcription is still playing catch-up), with backup options for YouTube transcript extraction when you're feeling lazy
-- **Voice Wizardry**: Transforms text into remarkably human-sounding speech using OpenAI's TTS API with 6 voice personalities
-- **Sync Sorcery**: Attempts to match audio timing with multiple methods (spoiler: it's harder than it looks, hence the contributor plea above)
-- **Final Assembly**: Marries your original video with the new audio track, hopefully without too much drama
+The system uses a multi-step pipeline for audio replacement:
+- **Video Input**: Accepts uploaded video files or YouTube URLs for processing
+- **Text Processing**: Primarily uses manual text input, with fallback options for YouTube transcript extraction
+- **Voice Generation**: Converts text to speech using OpenAI's TTS API with 6 voice options
+- **Audio Synchronization**: Applies timing algorithms to match audio duration with video length
+- **Final Assembly**: Combines original video with synchronized AI-generated audio
+
 
 
 ## Tech Stack 🛠️
 
-Built with **Streamlit** because life's too short for complex frontend frameworks, **OpenAI TTS API** for the voice magic, **YouTubeTranscriptApi** for when we need to extract existing captions, **yt-dlp** for video downloads (the hero we don't deserve), **FFmpeg** for the heavy video lifting, and **Librosa** for pretending we understand advanced audio analysis.
+Built with **Streamlit** for the web interface, **OpenAI TTS API** for voice generation, **YouTubeTranscriptApi** for caption extraction, **yt-dlp** for video downloads, **FFmpeg** for video processing, and **Librosa** for audio analysis.
+
+## Requirements 📋
+
+### Environment Setup
+```bash
+# Install dependencies
+pip install -r requirements.txt
+```
+
+### Dependencies (requirements.txt)
+```
+streamlit>=1.48.1
+yt-dlp>=2025.8.20
+youtube-transcript-api>=3.2.1
+openai>=1.0.0
+ffmpeg-python>=0.2.0
+moviepy>=2.2.1
+pydub>=0.25.1
+librosa>=0.10.0
+google-auth-oauthlib>=1.0.0
+google-api-python-client>=2.0.0
+google-auth>=2.0.0
+numpy>=1.21.0
+requests>=2.25.0
+```
+
+### System Requirements
+- **Python**: 3.11 or higher
+- **FFmpeg**: Required for video/audio processing (install via system package manager)
+- **IDE**: Any Python IDE (VS Code, PyCharm, etc.) or run directly with Streamlit
+- **Memory**: 4GB+ recommended for video processing
+- **Storage**: Temporary space for video files during processing
+
+### API Requirements
+- **OpenAI API Key**: Required for TTS generation
+  - Set as environment variable: `OPENAI_API_KEY=your_key_here`
+  - Cost: ~$15 per 1 million characters (very affordable for TTS)
+- **YouTube API Key** (Optional): For transcript extraction fallback
+  - Set as environment variable: `YOUTUBE_API_KEY=your_key_here` 
+- **Google OAuth Credentials** (Optional): For advanced YouTube transcript access
+  - Set as environment variable: `GOOGLE_OAUTH_CREDENTIALS_JSON=your_credentials_json`
+
+### Installation Notes
+```bash
+# On Ubuntu/Debian
+sudo apt update && sudo apt install ffmpeg
+
+# On macOS
+brew install ffmpeg
+
+# On Windows
+# Download FFmpeg from https://ffmpeg.org/download.html
+# Add to system PATH
+```
 
 ## Architecture 🏗️
 
-The Video SpeechSwap system follows a "let's make this work without breaking everything" architecture, designed for practical audio replacement with a side of optimistic synchronization.
+The Video SpeechSwap system follows a modular architecture designed for practical audio replacement.
 
 ### Core Components
 
-**The "Please Work" Interface Layer**
-- **Streamlit Web App**: Clean interface that doesn't require a PhD in web development to use
-- **Session State Juggling**: Keeps track of where you are in the process without losing your mind or your files
-- **Voice Personality Selector**: 6 OpenAI voices ranging from "professional narrator" to "that person who sounds way smarter than you"
-- **Speed Controls**: Because sometimes you need your AI narrator to slow down or speak like they've had too much coffee
+**Web Interface Layer**
+- **Streamlit Application**: Web interface with progress tracking and file management
+- **Session State Management**: Handles processing status and temporary file cleanup  
+- **Voice Controls**: 6 OpenAI TTS voice options with speed adjustment (0.25x to 4.0x)
+- **Sync Method Selection**: Multiple synchronization approaches for different content types
 
-**The "Trust Me, I Know What I'm Doing" Text Engine**
-- **Manual Text Input**: The star of the show - paste your text and let the magic happen
-- **YouTube Transcript Rescue Mission**: Falls back to extracting captions when available (uses YouTubeTranscriptApi, Google OAuth, and yt-dlp because redundancy is survival)
-- **Text Cleaning Service**: Removes weird characters and formatting that make TTS sound like it's having an existential crisis
-- **Multi-API Safety Net**: Because if one method fails, we've got backups for our backups
+**Text Processing Engine**
+- **Manual Text Input**: Primary method - users provide text for voice generation
+- **YouTube Transcript Extraction**: Fallback system using YouTubeTranscriptApi, Google OAuth, and yt-dlp
+- **Text Cleaning**: Removes problematic characters and formatting for optimal TTS output
+- **Multi-API Fallback**: Robust transcript extraction with multiple backup methods
 
-**The "Heavy Lifting" Video Engine**
-- **VideoProcessor Class**: The workhorse that handles video downloads and audio extraction without complaining
-- **Format Tolerance**: Accepts MP4, AVI, MOV, MKV, WebM - basically everything except that one weird format your friend always uses
-- **Duration Detective**: Figures out exact video timing for sync calculations (this part actually works well)
-- **Audio Extraction**: Cleanly separates audio tracks like a surgical precision tool, if surgery involved FFmpeg
+**Video Processing Engine**
+- **VideoProcessor**: Handles video downloads and audio extraction using FFmpeg
+- **Format Support**: Compatible with MP4, AVI, MOV, MKV, and WebM video formats
+- **Duration Analysis**: Precise timing calculation for synchronization methods
+- **Audio Extraction**: Clean separation of original audio tracks for analysis
 
-**The "Voice Actor in a Box" AI Layer**
-- **OpenAI TTS Integration**: Six professionally-trained AI voices that sound better than most of us on Monday mornings
-- **SyncFirstTTS**: The "measure twice, cut once" approach - calculates perfect speed before generating audio
-- **BasicTTSGenerator**: Handles standard voice generation with customizable personality and speed
-- **Audio Analysis**: Uses PyDub to detect pauses and silence (surprisingly philosophical when you think about it)
+**AI Voice Generation Layer**
+- **OpenAI TTS Integration**: Six professionally-trained AI voices for different speaking styles
+- **SyncFirstTTS**: Pre-calculates optimal TTS speed to match video duration
+- **BasicTTSGenerator**: Handles standard voice generation with speed and voice customization
+- **Audio Analysis**: Uses PyDub for silence detection and audio manipulation
 
-**The "Cross Your Fingers" Synchronization Systems**
-*(These work... most of the time... we're working on it)*
-1. **Sync-First Method**: Pre-calculates TTS speed to match video - like GPS for audio timing
-2. **Pause Analysis**: Detects silence gaps and tries to match them (results may vary, like horoscopes)
-3. **Smart Sync**: Uses Librosa for "advanced" audio analysis (translation: lots of math we hope works)
-4. **Enhanced Stretch**: Time-stretches audio while trying to preserve natural speech patterns
-5. **Basic Methods**: When all else fails, loop it, fade it, or just give up gracefully
+**Audio Synchronization Systems** *(Functional but seeking improvement)*
+1. **Sync-First Method**: Pre-calculates TTS speed to match video duration
+2. **Pause Analysis**: Detects silence gaps and attempts timing alignment
+3. **Smart Sync**: Uses Librosa for audio analysis and speech pattern matching
+4. **Enhanced Stretch**: Time-stretches audio while preserving natural speech patterns
+5. **Basic Methods**: Simple loop, fade, and duration-matching approaches
 
 ### Data Flow
-Video upload → Manual text paste (or transcript extraction for the brave) → TTS generation with timing wizardry → Synchronization attempts → Final video assembly → Cross fingers and download
+Video upload → Manual text input (or transcript extraction) → TTS generation with timing calculation → Synchronization processing → Final video assembly → Download
 
 ## AgentOps ⚙️
 
-The system implements operations that would make a production engineer slightly nervous but ultimately impressed.
+The system implements comprehensive processing operations for reliable video transformations.
 
-**The "Are We There Yet?" Pipeline**
-- **Progress Bars**: Visual feedback so you know the system hasn't given up on life
-- **Error Gracefully Handling**: When things go wrong (and they sometimes do), the system fails upward with helpful messages
-- **Temporary File Babysitting**: Creates files, uses files, cleans up files, repeat (with the dedication of a responsible pet owner)
+**Processing Pipeline Management**
+- **Progress Tracking**: Real-time visual progress with detailed status updates
+- **Error Handling**: Robust fallback mechanisms between different methods and API endpoints
+- **File Management**: Automatic cleanup of temporary files with secure handling
 
-**The "Voice Acting Academy" Operations**
-- **OpenAI API Whispering**: Direct communication with OpenAI's TTS models (they're surprisingly good listeners)
-- **Speed Calculation Magic**: Determines optimal speech speed based on text length and video duration
-- **Quality Control**: Text preprocessing that removes the stuff that makes AI voices sound like robots having a breakdown
-- **Voice Variety Show**: Six distinct personalities for when you can't decide if you want to sound authoritative or approachable
+**Text-to-Speech Operations**
+- **OpenAI API Integration**: Direct API communication with OpenAI's TTS models
+- **Speed Optimization**: Dynamic speed calculation based on text length and target duration
+- **Quality Processing**: Text preprocessing and cleaning for optimal TTS output
+- **Voice Options**: Six distinct voices with different characteristics and speaking styles
 
-**The "Timing is Everything" Synchronization** *(Contributors Desperately Wanted)*
-- **Multi-Method Madness**: Tries different sync approaches until something works acceptably well
-- **Duration Matching Attempts**: Math-heavy processes that sometimes produce beautiful results
-- **Audio Analysis**: Uses legitimate signal processing (PyDub and Librosa) to understand speech patterns
-- **Quality vs. Time Trade-offs**: Fast processing or good sync - pick one (we're working on having both)
+**Synchronization Processing** *(Seeking improvement from contributors)*
+- **Multi-Method Approach**: Multiple sync strategies with intelligent fallbacks
+- **Duration Matching**: Timing analysis and adjustment algorithms
+- **Audio Analysis**: Signal processing using PyDub and Librosa for speech pattern detection
+- **Quality Trade-offs**: Balance between processing speed and synchronization accuracy
 
-**The "File Wrangling Rodeo" Operations**
-- **Video Download Service**: Grabs YouTube videos with the determination of a motivated intern
-- **Audio Extraction Precision**: Separates audio from video cleaner than most breakups
-- **Format Conversion Diplomacy**: Handles multiple formats without starting international incidents
-- **Output Assembly Line**: Puts everything back together like video Humpty Dumpty
+**Media Processing Operations**
+- **Video Download**: YouTube video acquisition with error handling
+- **Audio Extraction**: Clean audio track separation using FFmpeg and MoviePy
+- **Format Handling**: Multiple video and audio format support with automatic conversion
+- **Output Assembly**: Final video compilation with quality optimization
 
 ## Why It's Effective 🌟
 
-- **Real-World Problem Solving**: Born from the frustration of "I just want to understand this Python tutorial without rewinding 47 times"
-- **Practical Over Perfect**: Prioritizes functional results over theoretical perfection (though we're working on both)
-- **Voice Variety**: Six AI personalities because everyone learns differently, and some of us prefer narrators who don't sound like they're reading a phone book
-- **Manual Text Power**: Complete control over output means no "the AI thought they said 'duck' when they clearly meant 'dock'" situations
-- **Educational Focus**: Specifically designed for making coding tutorials, tech talks, and educational content more accessible to human ears
+- **Practical Solution**: Addresses real comprehension barriers in technical content
+- **Manual Control**: Primary focus on user-provided text eliminates transcription errors
+- **Voice Options**: Six professional AI voices for different learning preferences  
+- **Educational Focus**: Optimized for coding tutorials and technical educational content
+- **Accessibility**: Makes technical content more accessible regardless of original audio quality
 
-*Disclaimer: While the audio will sound professional and clear, the lip sync might occasionally give your videos a "poorly dubbed martial arts movie" vibe. We're embracing this as a feature while secretly working on a fix.*
+*Note: Audio quality is professional and clear. Synchronization is functional but lip sync accuracy remains limited.*
 
 ## Customization Options 🛠️
 
-**The "Make It Your Own" Self-Service Menu**
-- **Voice Casting**: Choose from 6 AI voice actors who never demand overtime pay or artistic creative control
-- **Speed Dial**: Adjust speech from "meditation guru" (0.25x) to "auctioneer having a panic attack" (4.0x)
-- **Sync Strategy Selection**: Pick your synchronization poison based on how much you trust our algorithms
-- **Text Liberation**: Complete freedom through manual input - no AI trying to guess what humans actually said
+**Self-Service Configuration**
+- **Voice Selection**: Choose from 6 AI voices with distinct characteristics and speaking styles
+- **Speed Control**: Adjust speech rate from 0.25x to 4.0x for optimal comprehension
+- **Sync Strategy**: Select synchronization method based on content type and quality requirements
+- **Text Input**: Complete control through manual text input rather than auto-transcription
 
-**The "Under the Hood" Technical Tweaking**
-- **Sync Algorithm Surgery**: Modify timing calculations, pause detection, and stretch ratios (warranty void if you break anything)
-- **Audio Processing Philosophy**: Adjust how the system thinks about silence, speech, and the meaning of existence
-- **Transcript Extraction Hierarchy**: Configure which backup methods kick in when the primary approach has an existential crisis
-- **Output Quality Negotiations**: Balance file size, processing time, and video quality like a diplomatic summit
+**Technical Configuration**
+- **Sync Algorithm Adjustment**: Modify timing calculations, pause detection thresholds, and stretch ratios
+- **Audio Processing**: Configure silence detection parameters and speech analysis settings  
+- **Transcript Extraction**: Set API preferences and fallback method priorities
+- **Output Settings**: Customize video encoding parameters and quality settings
 
-**The "Please Help Us" Contributor Wishlist** 🤝
-- **Lip Sync Enlightenment**: We need someone who understands the dark arts of visual-audio alignment
-- **Timing Analysis Wizardry**: Advanced speech pattern matching that actually works consistently
-- **Pause Detection Mastery**: Better silence boundary detection (harder than it sounds, no pun intended)
-- **Sync Quality Metrics**: Tools to measure just how off our timing really is (ignorance was bliss)
+**Areas Seeking Contributors** 🤝
+- **Lip Sync Improvement**: Advanced visual-audio alignment algorithms
+- **Timing Analysis**: Enhanced speech pattern matching and synchronization accuracy
+- **Pause Detection**: Better silence boundary detection and speech segmentation
+- **Sync Quality Metrics**: Tools to measure and improve timing accuracy
 
-**Professional "We'll Do It For You" Services**
-- **Custom Algorithm Development**: Specialized sync solutions for when you need better than "pretty good"
-- **Batch Processing Systems**: For when you have 200 videos and a deadline
-- **Enterprise Integration**: Making this work with your existing video workflows without breaking everything
-- **Quality Enhancement Suite**: Additional audio processing that makes everything sound even more professional
+**Professional Services**
+- **Custom Algorithm Development**: Specialized sync solutions for specific requirements
+- **Batch Processing**: Automated processing systems for large video collections
+- **Enterprise Integration**: Integration with existing video workflows and systems
+- **Quality Enhancement**: Additional audio processing and optimization features
 
-The system delivers immediate value for anyone who's ever wished technical content came with subtitles for their ears, while providing endless opportunities for community improvement (especially if you know more about audio synchronization than we do).
+The system provides practical value for making technical content more accessible while offering opportunities for community improvement in synchronization accuracy.
