@@ -96,11 +96,17 @@ def process_video(uploaded_video, manual_text, tts_voice, speech_speed, pause_de
         print(f"Error details: {traceback.format_exc()}")
 
 def main():
-    # Custom CSS for professional background
+    # Custom CSS for fine striped background
     st.markdown("""
     <style>
     .stApp {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: repeating-linear-gradient(
+            90deg,
+            #ffffff 0px,
+            #ffffff 2px,
+            #e3f2fd 2px,
+            #e3f2fd 4px
+        );
         background-attachment: fixed;
     }
     
