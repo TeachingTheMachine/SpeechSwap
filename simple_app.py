@@ -96,6 +96,89 @@ def process_video(uploaded_video, manual_text, tts_voice, speech_speed, pause_de
         print(f"Error details: {traceback.format_exc()}")
 
 def main():
+    # Custom CSS for professional background
+    st.markdown("""
+    <style>
+    .stApp {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background-attachment: fixed;
+    }
+    
+    .main > div {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 15px;
+        padding: 2rem;
+        margin: 1rem;
+        box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+    }
+    
+    .stSelectbox > div > div {
+        background: rgba(255, 255, 255, 0.9);
+        border-radius: 8px;
+    }
+    
+    .stTextArea > div > div {
+        background: rgba(255, 255, 255, 0.9);
+        border-radius: 8px;
+    }
+    
+    .stFileUploader > div {
+        background: rgba(255, 255, 255, 0.9);
+        border-radius: 8px;
+        border: 2px dashed #667eea;
+    }
+    
+    .uploadedFile {
+        background: rgba(255, 255, 255, 0.9);
+        border-radius: 8px;
+    }
+    
+    h1, h2, h3 {
+        color: #2c3e50;
+        text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.7);
+    }
+    
+    .stButton > button {
+        background: linear-gradient(45deg, #667eea, #764ba2);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+    }
+    
+    .stMetric {
+        background: rgba(255, 255, 255, 0.8);
+        padding: 1rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+    
+    .stProgress .st-bo {
+        background: linear-gradient(90deg, #667eea, #764ba2);
+    }
+    
+    .stAlert {
+        border-radius: 8px;
+        backdrop-filter: blur(10px);
+    }
+    
+    .stSidebar {
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.85));
+        backdrop-filter: blur(15px);
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
     # Header Section
     st.markdown("""
     # 🎬 Video SpeechSwap
