@@ -158,20 +158,29 @@ def main():
     }
     
     .stButton > button {
-        background: linear-gradient(45deg, #6c757d, #495057);
-        color: white;
-        border: none;
+        background: linear-gradient(45deg, #343a40, #212529) !important;
+        color: #ffffff !important;
+        border: none !important;
         border-radius: 8px;
         padding: 0.5rem 1rem;
-        font-weight: 600;
+        font-weight: 700 !important;
+        font-size: 16px !important;
         transition: all 0.3s ease;
-        box-shadow: 0 4px 15px rgba(108, 117, 125, 0.4);
+        box-shadow: 0 4px 15px rgba(52, 58, 64, 0.4);
+        text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5) !important;
     }
     
     .stButton > button:hover {
         transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(108, 117, 125, 0.6);
-        background: linear-gradient(45deg, #5a6268, #3d4146);
+        box-shadow: 0 6px 20px rgba(52, 58, 64, 0.6);
+        background: linear-gradient(45deg, #495057, #343a40) !important;
+        color: #ffffff !important;
+    }
+    
+    .stButton > button:focus {
+        color: #ffffff !important;
+        background: linear-gradient(45deg, #343a40, #212529) !important;
+        outline: none !important;
     }
     
     .stMetric {
