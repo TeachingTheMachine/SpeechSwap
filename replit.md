@@ -19,6 +19,8 @@ Preferred communication style: Simple, everyday language.
   - `VideoProcessor`: Handles YouTube video downloading and video file operations
   - `AudioUtils`: Manages audio extraction from videos and transcription
   - `TTSGenerator`: Handles text-to-speech generation with voice customization
+  - `AudioSynchronizer`: Advanced speech pattern analysis for lip sync using librosa
+  - `PauseSync`: Pause-based audio synchronization analyzing silence gaps in both audio files
 - **Temporary File Management**: Uses Python's `tempfile` module with automatic cleanup functionality
 - **Error Handling**: Comprehensive exception handling with user-friendly error messages
 
@@ -27,8 +29,11 @@ Preferred communication style: Simple, everyday language.
 - **Audio Extraction**: Uses `moviepy` to separate audio tracks from video files
 - **Speech Transcription**: Leverages OpenAI's Whisper API for accurate speech-to-text conversion
 - **TTS Generation**: Generates new audio using OpenAI's TTS API with multiple voice options
-- **Audio Synchronization**: Maintains timing and video-audio synchronization
-- **Final Assembly**: Combines original video with new TTS audio using `moviepy`
+- **Audio Synchronization**: Multiple methods available:
+  - **Pause Analysis** (Default): Analyzes silence gaps in both original and TTS audio, stretches speech segments to match timing precisely
+  - **Smart Sync**: Uses librosa for advanced speech pattern analysis and onset detection
+  - **Basic Methods**: Stretch, loop, fade options for simpler synchronization
+- **Final Assembly**: Combines original video with synchronized TTS audio using FFmpeg
 
 ## Data Flow
 1. User inputs YouTube URL or uploads video file

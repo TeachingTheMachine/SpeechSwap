@@ -67,27 +67,25 @@ def main():
         help="Adjust the speed of the generated speech"
     )
     
-    # Advanced Sync Settings (collapsed by default)
-    with st.sidebar.expander("Advanced Sync Settings", expanded=False):
-        st.markdown("**Default: Smart Sync** - Analyzes speech patterns for best lip sync")
-        
-        use_fallback = st.checkbox(
-            "Use fallback method instead", 
-            value=False,
-            help="Skip smart sync and use a simpler method"
-        )
-        
-        if use_fallback:
-            sync_method = st.selectbox(
-                "Fallback Sync Method",
-                options=["stretch", "auto_speed", "loop", "fade", "shortest"],
-                index=0,
-                help="Choose fallback synchronization method"
-            )
-        else:
-            sync_method = "smart"
-            
-        st.caption("Smart sync analyzes speech timing for better lip synchronization")
+    # Audio Synchronization Method
+    sync_method = st.sidebar.selectbox(
+        "Audio Sync Method",
+        options=["pause_analysis", "smart", "stretch", "auto_speed", "loop", "fade", "shortest"],
+        index=0,
+        help="Choose synchronization method:\n"
+             "• Pause Analysis: Analyzes pauses in both audio files for precise timing\n"
+             "• Smart: Advanced speech pattern analysis\n"
+             "• Stretch: Simple time stretching\n"
+             "• Auto Speed: Adjust TTS speed automatically\n"
+             "• Loop/Fade/Shortest: Basic methods"
+    )
+    
+    if sync_method == "pause_analysis":
+        st.sidebar.info("🎯 Pause Analysis: Detects silence gaps in original and TTS audio, then stretches speech segments to match timing precisely.")
+    elif sync_method == "smart":
+        st.sidebar.info("🧠 Smart Sync: Advanced analysis using speech patterns and energy detection.")
+    else:
+        st.sidebar.info(f"📝 Using {sync_method} method for audio synchronization.")
     
     # Main content area
     col1, col2 = st.columns([2, 1])
@@ -216,7 +214,11 @@ def process_video_manual(uploaded_video, manual_text, tts_voice, speech_speed, s
                     st.audio(tts_audio_path, format='audio/mp3')
             
             # Step 3: Replace audio in video
-            if sync_method == "smart":
+            if sync_method == "pause_analysis":
+                st.info("🔄 Step 3: Pause Analysis - analyzing silence gaps in both audio files...")
+                sync_status = st.empty()
+                sync_status.info("🎯 Using pause analysis for precise timing synchronization")
+            elif sync_method == "smart":
                 st.info("🔄 Step 3: Smart synchronization - analyzing speech patterns...")
                 sync_status = st.empty()
                 sync_status.info("🧠 Using smart sync for better lip synchronization")
@@ -224,11 +226,22 @@ def process_video_manual(uploaded_video, manual_text, tts_voice, speech_speed, s
                 st.info(f"🔄 Step 3: Combining video with new audio using '{sync_method}' method...")
                 sync_status = st.empty()
             
-            # Progress callback for smart sync
-            smart_progress_bar = st.progress(70)
+            # Progress callback for sync methods
+            sync_progress_bar = st.progress(70)
             def sync_progress_callback(p):
-                smart_progress_bar.progress(70 + int(p * 0.3))
-                if sync_method == "smart" and p < 100:
+                sync_progress_bar.progress(70 + int(p * 0.3))
+                if sync_method == "pause_analysis" and p < 100:
+                    if p < 15:
+                        sync_status.info("🔊 Extracting original audio...")
+                    elif p < 40:
+                        sync_status.info("📊 Analyzing pause structure in original audio...")
+                    elif p < 65:
+                        sync_status.info("🎤 Analyzing pause structure in TTS audio...")
+                    elif p < 70:
+                        sync_status.info("🔗 Creating pause-based timing mapping...")
+                    else:
+                        sync_status.info("⚙️ Applying pause-based timing adjustments...")
+                elif sync_method == "smart" and p < 100:
                     if p < 25:
                         sync_status.info("🔊 Extracting original audio for analysis...")
                     elif p < 50:
@@ -245,9 +258,11 @@ def process_video_manual(uploaded_video, manual_text, tts_voice, speech_speed, s
                 sync_method=sync_method,
                 progress_callback=sync_progress_callback
             )
-            smart_progress_bar.progress(100)
+            sync_progress_bar.progress(100)
             
-            if sync_method == "smart":
+            if sync_method == "pause_analysis":
+                sync_status.success("✅ Pause analysis synchronization complete!")
+            elif sync_method == "smart":
                 sync_status.success("✅ Smart synchronization complete!")
             else:
                 sync_status.success("✅ Audio synchronization complete!")

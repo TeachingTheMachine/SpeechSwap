@@ -25,6 +25,7 @@ from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 from audio_synchronizer import AudioSynchronizer
+from pause_sync import PauseSync
 
 class VideoProcessor:
 
@@ -33,6 +34,7 @@ class VideoProcessor:
         self.youtube_service = None
         self.oauth_creds = None
         self.audio_sync = AudioSynchronizer()
+        self.pause_sync = PauseSync()
 
     def extract_video_id(self, youtube_url):
         patterns = [
@@ -275,7 +277,7 @@ class VideoProcessor:
             return float(result.stdout.strip())
         return 0
 
-    def replace_audio(self, video_path, new_audio_path, output_dir, sync_method="smart", progress_callback=None):
+    def replace_audio(self, video_path, new_audio_path, output_dir, sync_method="pause_analysis", progress_callback=None):
         try:
             if video_path == "TRANSCRIPT_ONLY":
                 output_path = os.path.join(output_dir, "output_audio.mp3")
@@ -290,8 +292,57 @@ class VideoProcessor:
             
             print(f"Video duration: {video_duration:.2f}s, Audio duration: {audio_duration:.2f}s")
 
-            # Try smart sync first (default method)
-            if sync_method == "smart":
+            # Try pause analysis sync first (default method)
+            if sync_method == "pause_analysis":
+                try:
+                    print("Using pause-based audio synchronization")
+                    if progress_callback:
+                        progress_callback(10)
+                    
+                    # Use pause analysis to create perfectly timed audio
+                    def pause_progress(p):
+                        if progress_callback:
+                            progress_callback(10 + int(p * 0.7))  # 10-80% for pause sync
+                    
+                    synchronized_audio = self.pause_sync.synchronize_with_pause_analysis(
+                        video_path, new_audio_path, output_dir, pause_progress
+                    )
+                    
+                    if progress_callback:
+                        progress_callback(80)
+                    
+                    # Now combine with video using the synchronized audio
+                    cmd = [
+                        'ffmpeg', '-y',
+                        '-i', video_path,
+                        '-i', synchronized_audio,
+                        '-c:v', 'copy',
+                        '-map', '0:v:0',
+                        '-map', '1:a:0',
+                        '-shortest',
+                        output_path
+                    ]
+                    
+                    result = subprocess.run(cmd, capture_output=True, text=True)
+                    
+                    if result.returncode == 0:
+                        if progress_callback:
+                            progress_callback(100)
+                        final_duration = self._get_duration(output_path)
+                        print(f"Pause analysis sync successful! Final duration: {final_duration:.2f}s")
+                        return output_path
+                    else:
+                        print(f"Video combination failed, falling back to stretch method: {result.stderr}")
+                        
+                except Exception as e:
+                    print(f"Pause analysis sync failed, falling back to stretch method: {str(e)}")
+                
+                # Fallback to stretch method
+                sync_method = "stretch"
+                print("Falling back to stretch method")
+
+            # Try smart sync as backup
+            elif sync_method == "smart":
                 try:
                     print("Using smart audio synchronization")
                     if progress_callback:
