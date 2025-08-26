@@ -2,43 +2,44 @@ import os
 import tempfile
 import subprocess
 import re
-import base64
+from openai import OpenAI
 
 class BasicTTSGenerator:
-    """Google Cloud Text-to-Speech generator using Google Cloud TTS API"""
+    """OpenAI Text-to-Speech generator using OpenAI TTS API"""
     
     def __init__(self):
-        # Check if Google Cloud TTS is available
+        # Initialize OpenAI client
         try:
-            from google.cloud import texttospeech
-            self.tts_client = texttospeech.TextToSpeechClient()
-            self.google_tts_available = True
-            print("Google Cloud TTS initialized successfully")
+            api_key = os.environ.get("OPENAI_API_KEY")
+            if not api_key:
+                raise Exception("OPENAI_API_KEY environment variable not found")
+            
+            self.openai_client = OpenAI(api_key=api_key)
+            self.openai_tts_available = True
+            print("OpenAI TTS initialized successfully")
         except Exception as e:
-            self.google_tts_available = False
-            print(f"Google Cloud TTS not available: {e}")
+            self.openai_tts_available = False
+            print(f"OpenAI TTS not available: {e}")
         
-        # Available Google Cloud TTS voices
+        # Available OpenAI TTS voices
         self.available_voices = {
-            "en-US-Wavenet-D": "English US (Male, Natural)",
-            "en-US-Wavenet-F": "English US (Female, Natural)", 
-            "en-GB-Wavenet-A": "English UK (Female, Natural)",
-            "en-GB-Wavenet-B": "English UK (Male, Natural)",
-            "en-AU-Wavenet-A": "English Australia (Female, Natural)",
-            "en-AU-Wavenet-B": "English Australia (Male, Natural)",
-            "en-CA-Wavenet-A": "English Canada (Female, Natural)",
-            "en-CA-Wavenet-B": "English Canada (Male, Natural)"
+            "alloy": "Alloy (Balanced, Versatile)",
+            "echo": "Echo (Male, Clear)", 
+            "fable": "Fable (Expressive, Warm)",
+            "onyx": "Onyx (Male, Deep)",
+            "nova": "Nova (Female, Bright)",
+            "shimmer": "Shimmer (Female, Soft)"
         }
     
-    def generate_speech(self, text, output_dir, voice="en-US-Wavenet-F", speed=1.0):
+    def generate_speech(self, text, output_dir, voice="nova", speed=1.0):
         """
-        Generate speech from text using Google Cloud TTS API
+        Generate speech from text using OpenAI TTS API
         
         Args:
             text (str): Text to convert to speech
             output_dir (str): Directory to save the audio file
-            voice (str): Voice name from Google Cloud TTS
-            speed (float): Speed of speech
+            voice (str): Voice name from OpenAI TTS
+            speed (float): Speed of speech (0.25 to 4.0)
             
         Returns:
             str: Path to the generated audio file
@@ -52,55 +53,37 @@ class BasicTTSGenerator:
             
             output_path = os.path.join(output_dir, "tts_audio.mp3")
             
-            # Check if Google Cloud TTS is available
-            if not self.google_tts_available:
-                raise Exception("Google Cloud TTS is not available. Please set up Google Cloud credentials.")
-            
-            # Use Google Cloud TTS API
-            from google.cloud import texttospeech
+            # Check if OpenAI TTS is available
+            if not self.openai_tts_available:
+                raise Exception("OpenAI TTS is not available. Please check your API key.")
             
             # Ensure voice is valid
             if voice not in self.available_voices:
-                voice = "en-US-Wavenet-F"  # Default to female US English
+                voice = "nova"  # Default to Nova voice
             
-            # Set up synthesis input
-            synthesis_input = texttospeech.SynthesisInput(text=cleaned_text)
+            # Clamp speed to valid range for OpenAI TTS
+            speed = max(0.25, min(4.0, speed))
             
-            # Parse voice name to get language and voice name
-            language_code = '-'.join(voice.split('-')[:2])  # e.g., "en-US" from "en-US-Wavenet-F"
-            voice_name = voice
-            
-            # Build the voice selection
-            voice_selection = texttospeech.VoiceSelectionParams(
-                language_code=language_code,
-                name=voice_name
-            )
-            
-            # Select the type of audio file to return
-            audio_config = texttospeech.AudioConfig(
-                audio_encoding=texttospeech.AudioEncoding.MP3,
-                speaking_rate=speed
-            )
-            
-            # Perform the text-to-speech request
-            response = self.tts_client.synthesize_speech(
-                input=synthesis_input,
-                voice=voice_selection,
-                audio_config=audio_config
+            # Use OpenAI TTS API
+            response = self.openai_client.audio.speech.create(
+                model="tts-1",  # Use tts-1 model for faster generation
+                voice=voice,
+                input=cleaned_text,
+                speed=speed
             )
             
             # Write the response to the output file
-            with open(output_path, "wb") as out:
-                out.write(response.audio_content)
+            with open(output_path, "wb") as f:
+                for chunk in response.iter_bytes():
+                    f.write(chunk)
                 
-            print(f"Google Cloud TTS audio generated successfully: {output_path}")
+            print(f"OpenAI TTS audio generated successfully: {output_path}")
             return output_path
             
         except Exception as e:
-            raise Exception(f"Failed to generate Google Cloud TTS audio: {str(e)}")
+            raise Exception(f"Failed to generate OpenAI TTS audio: {str(e)}")
     
-    
-    
+        
     def _clean_text_for_tts(self, text):
         """Clean and prepare text for TTS generation"""
         # Remove URLs

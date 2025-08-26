@@ -32,23 +32,21 @@ def cleanup_temp_files():
 def main():
     st.title("🎬 YouTube Voice Replacement - Simple Version")
     st.markdown("""
-    Replace video audio with AI-generated speech using **Google Cloud Text-to-Speech**.
+    Replace video audio with AI-generated speech using **OpenAI Text-to-Speech**.
     Paste your text and choose from high-quality voices to replace the video's audio.
     """)
     
     # Sidebar for settings
     st.sidebar.header("Settings")
     
-    # TTS Voice selection (Google Cloud TTS voices)
+    # TTS Voice selection (OpenAI TTS voices)
     voice_options = {
-        "en-US-Wavenet-D": "English US (Male, Natural)",
-        "en-US-Wavenet-F": "English US (Female, Natural)", 
-        "en-GB-Wavenet-A": "English UK (Female, Natural)",
-        "en-GB-Wavenet-B": "English UK (Male, Natural)",
-        "en-AU-Wavenet-A": "English Australia (Female, Natural)",
-        "en-AU-Wavenet-B": "English Australia (Male, Natural)",
-        "en-CA-Wavenet-A": "English Canada (Female, Natural)",
-        "en-CA-Wavenet-B": "English Canada (Male, Natural)"
+        "alloy": "Alloy (Balanced, Versatile)",
+        "echo": "Echo (Male, Clear)", 
+        "fable": "Fable (Expressive, Warm)",
+        "onyx": "Onyx (Male, Deep)",
+        "nova": "Nova (Female, Bright)",
+        "shimmer": "Shimmer (Female, Soft)"
     }
     
     tts_voice = st.sidebar.selectbox(
