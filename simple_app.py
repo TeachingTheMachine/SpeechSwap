@@ -114,8 +114,8 @@ def main():
         background: rgba(255, 255, 255, 0.95);
         backdrop-filter: blur(10px);
         border-radius: 15px;
-        padding: 2rem;
-        margin: 1rem;
+        padding: 1.5rem;
+        margin: 0.5rem;
         box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
         border: 1px solid rgba(255, 255, 255, 0.18);
     }
@@ -133,7 +133,7 @@ def main():
     .stFileUploader > div {
         background: rgba(255, 255, 255, 0.9);
         border-radius: 8px;
-        border: 2px dashed #667eea;
+        border: 2px dashed #6c757d;
     }
     
     .uploadedFile {
@@ -144,22 +144,34 @@ def main():
     h1, h2, h3 {
         color: #2c3e50;
         text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.7);
+        margin-bottom: 0.5rem !important;
+        margin-top: 0.5rem !important;
+    }
+    
+    .block-container {
+        padding-top: 1rem !important;
+        padding-bottom: 1rem !important;
+    }
+    
+    .element-container {
+        margin-bottom: 0.5rem !important;
     }
     
     .stButton > button {
-        background: linear-gradient(45deg, #667eea, #764ba2);
+        background: linear-gradient(45deg, #6c757d, #495057);
         color: white;
         border: none;
         border-radius: 8px;
         padding: 0.5rem 1rem;
         font-weight: 600;
         transition: all 0.3s ease;
-        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        box-shadow: 0 4px 15px rgba(108, 117, 125, 0.4);
     }
     
     .stButton > button:hover {
         transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        box-shadow: 0 6px 20px rgba(108, 117, 125, 0.6);
+        background: linear-gradient(45deg, #5a6268, #3d4146);
     }
     
     .stMetric {
@@ -170,7 +182,7 @@ def main():
     }
     
     .stProgress .st-bo {
-        background: linear-gradient(90deg, #667eea, #764ba2);
+        background: linear-gradient(90deg, #6c757d, #495057);
     }
     
     .stAlert {
