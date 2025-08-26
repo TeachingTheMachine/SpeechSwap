@@ -24,6 +24,7 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
+from audio_synchronizer import AudioSynchronizer
 
 class VideoProcessor:
 
@@ -31,6 +32,7 @@ class VideoProcessor:
         self.supported_formats = ['mp4', 'avi', 'mov', 'mkv', 'webm']
         self.youtube_service = None
         self.oauth_creds = None
+        self.audio_sync = AudioSynchronizer()
 
     def extract_video_id(self, youtube_url):
         patterns = [
@@ -223,8 +225,8 @@ class VideoProcessor:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info_dict = ydl.extract_info(youtube_url, download=False)
 
-                subtitles = info_dict.get('subtitles') or {}
-                auto_captions = info_dict.get('automatic_captions') or {}
+                subtitles = info_dict.get('subtitles') if info_dict.get('subtitles') is not None else {}
+                auto_captions = info_dict.get('automatic_captions') if info_dict.get('automatic_captions') is not None else {}
 
                 for lang in ['en', 'en-US', 'en-GB']:
                     if lang in subtitles:
@@ -273,7 +275,7 @@ class VideoProcessor:
             return float(result.stdout.strip())
         return 0
 
-    def replace_audio(self, video_path, new_audio_path, output_dir, sync_method="stretch"):
+    def replace_audio(self, video_path, new_audio_path, output_dir, sync_method="smart", progress_callback=None):
         try:
             if video_path == "TRANSCRIPT_ONLY":
                 output_path = os.path.join(output_dir, "output_audio.mp3")
@@ -287,6 +289,55 @@ class VideoProcessor:
             output_path = os.path.join(output_dir, "output_video.mp4")
             
             print(f"Video duration: {video_duration:.2f}s, Audio duration: {audio_duration:.2f}s")
+
+            # Try smart sync first (default method)
+            if sync_method == "smart":
+                try:
+                    print("Using smart audio synchronization")
+                    if progress_callback:
+                        progress_callback(10)
+                    
+                    # Use smart sync to create perfectly timed audio
+                    def smart_progress(p):
+                        if progress_callback:
+                            progress_callback(10 + int(p * 0.7))  # 10-80% for smart sync
+                    
+                    synchronized_audio = self.audio_sync.smart_sync(
+                        video_path, new_audio_path, output_dir, smart_progress
+                    )
+                    
+                    if progress_callback:
+                        progress_callback(80)
+                    
+                    # Now combine with video using the synchronized audio
+                    cmd = [
+                        'ffmpeg', '-y',
+                        '-i', video_path,
+                        '-i', synchronized_audio,
+                        '-c:v', 'copy',
+                        '-map', '0:v:0',
+                        '-map', '1:a:0',
+                        '-shortest',
+                        output_path
+                    ]
+                    
+                    result = subprocess.run(cmd, capture_output=True, text=True)
+                    
+                    if result.returncode == 0:
+                        if progress_callback:
+                            progress_callback(100)
+                        final_duration = self._get_duration(output_path)
+                        print(f"Smart sync successful! Final duration: {final_duration:.2f}s")
+                        return output_path
+                    else:
+                        print(f"Video combination failed, falling back to stretch method: {result.stderr}")
+                        
+                except Exception as e:
+                    print(f"Smart sync failed, falling back to stretch method: {str(e)}")
+                
+                # Fallback to stretch method
+                sync_method = "stretch"
+                print("Falling back to stretch method")
 
             if sync_method == "stretch" and video_duration > 0 and audio_duration > 0:
                 # Method 1: Stretch/compress audio to match video duration

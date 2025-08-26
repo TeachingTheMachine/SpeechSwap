@@ -52,6 +52,11 @@ Preferred communication style: Simple, everyday language.
   - TTS API for text-to-speech generation with multiple voice options
 - **API Authentication**: Requires OPENAI_API_KEY environment variable
 
+## Audio Analysis Libraries
+- **Librosa**: Advanced audio analysis for speech pattern detection and timing analysis
+- **NumPy**: Numerical computing for audio signal processing and analysis
+- **AudioSynchronizer**: Custom smart sync system for speech pattern matching
+
 ## Media Processing
 - **FFmpeg**: Required by MoviePy for video/audio encoding and decoding operations
 - **Audio Codecs**: Support for various audio formats (WAV, MP3, etc.)
@@ -61,3 +66,4 @@ Preferred communication style: Simple, everyday language.
 - **Temporary Storage**: Local file system access for processing temporary files
 - **Network Access**: Required for YouTube video downloads and OpenAI API calls
 - **Memory Management**: Handles video processing in memory with cleanup routines
+- **Caching System**: Stores audio analysis results to avoid re-processing identical videos

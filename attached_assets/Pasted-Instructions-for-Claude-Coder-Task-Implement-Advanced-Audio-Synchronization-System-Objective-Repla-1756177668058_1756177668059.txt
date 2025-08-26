@@ -1,0 +1,48 @@
+Instructions for Claude Coder
+Task: Implement Advanced Audio Synchronization System
+Objective: Replace the basic audio synchronization in the YouTube Voice Replacement app with an intelligent system that analyzes speech patterns to achieve better lip sync.
+Requirements
+1. Create New File: audio_synchronizer.py
+
+Create an AudioSynchronizer class
+Add dependencies to pyproject.toml: librosa>=0.10.0, numpy>=1.21.0
+
+2. Core Functionality:
+
+analyze_speech_timing(audio_path): Use librosa to detect speech segments, silence gaps, word boundaries via onset detection, and energy patterns. Return timing data structure.
+map_tts_to_original(original_patterns, tts_audio_path): Analyze TTS audio with same methods, create alignment mapping between original and TTS segments.
+apply_timing_adjustments(tts_path, timing_map, output_path): Use ffmpeg filters to time-stretch TTS audio segments to match original timing while preserving quality.
+smart_sync(video_path, tts_audio_path, output_dir): Main method that orchestrates the full process.
+
+3. Integration Changes:
+
+Modify video_processor.py: Update replace_audio() method to use smart_sync as default instead of current stretch method
+Keep existing sync methods as fallbacks if smart sync fails
+Add caching: Store analysis results using video file hash, check cache before re-analyzing same video
+
+4. Progress Tracking:
+
+Add progress callbacks/streamlit progress bars for: audio extraction (25%), original analysis (50%), TTS analysis (75%), audio reconstruction (100%)
+Integrate with existing streamlit progress system in simple_app.py
+
+5. Error Handling:
+
+Fallback to existing "stretch" method if librosa analysis fails
+Handle cases where audio has no clear speech patterns
+Provide informative error messages for users
+
+6. User Interface:
+
+Remove sync method dropdown from simple_app.py sidebar (smart sync becomes default)
+Add optional "Advanced Sync Settings" expander with fallback options
+Show sync method used in processing feedback ("Using smart sync" vs "Fallback to stretch")
+
+Expected Behavior
+The system should analyze the original video's speech timing, map the TTS audio to match those patterns, and produce video output where the AI voice closely matches the original speaker's mouth movements and pacing.
+Files to Modify
+
+Create: audio_synchronizer.py
+Modify: pyproject.toml, video_processor.py, simple_app.py
+Update: Any progress tracking systems
+
+Implement with robust error handling and maintain compatibility with existing OpenAI TTS pipeline.

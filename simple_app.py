@@ -67,18 +67,27 @@ def main():
         help="Adjust the speed of the generated speech"
     )
     
-    # Audio-Video Synchronization Method
-    sync_method = st.sidebar.selectbox(
-        "Audio-Video Sync Method",
-        options=["stretch", "auto_speed", "loop", "fade", "shortest"],
-        index=0,
-        help="Choose how to synchronize audio with video duration:\n"
-             "• Stretch: Adjust audio speed to match video length\\n"
-             "• Auto Speed: Automatically adjust TTS speed for target duration\\n" 
-             "• Loop: Repeat audio to fill video duration\\n"
-             "• Fade: Fade audio in/out to match duration\\n"
-             "• Shortest: Use shortest of audio/video duration"
-    )
+    # Advanced Sync Settings (collapsed by default)
+    with st.sidebar.expander("Advanced Sync Settings", expanded=False):
+        st.markdown("**Default: Smart Sync** - Analyzes speech patterns for best lip sync")
+        
+        use_fallback = st.checkbox(
+            "Use fallback method instead", 
+            value=False,
+            help="Skip smart sync and use a simpler method"
+        )
+        
+        if use_fallback:
+            sync_method = st.selectbox(
+                "Fallback Sync Method",
+                options=["stretch", "auto_speed", "loop", "fade", "shortest"],
+                index=0,
+                help="Choose fallback synchronization method"
+            )
+        else:
+            sync_method = "smart"
+            
+        st.caption("Smart sync analyzes speech timing for better lip synchronization")
     
     # Main content area
     col1, col2 = st.columns([2, 1])
@@ -207,14 +216,42 @@ def process_video_manual(uploaded_video, manual_text, tts_voice, speech_speed, s
                     st.audio(tts_audio_path, format='audio/mp3')
             
             # Step 3: Replace audio in video
-            st.info(f"🔄 Step 3: Combining video with new audio using '{sync_method}' method...")
+            if sync_method == "smart":
+                st.info("🔄 Step 3: Smart synchronization - analyzing speech patterns...")
+                sync_status = st.empty()
+                sync_status.info("🧠 Using smart sync for better lip synchronization")
+            else:
+                st.info(f"🔄 Step 3: Combining video with new audio using '{sync_method}' method...")
+                sync_status = st.empty()
+            
+            # Progress callback for smart sync
+            smart_progress_bar = st.progress(70)
+            def sync_progress_callback(p):
+                smart_progress_bar.progress(70 + int(p * 0.3))
+                if sync_method == "smart" and p < 100:
+                    if p < 25:
+                        sync_status.info("🔊 Extracting original audio for analysis...")
+                    elif p < 50:
+                        sync_status.info("📊 Analyzing original speech patterns...")
+                    elif p < 75:
+                        sync_status.info("🎯 Mapping TTS audio to speech timing...")
+                    else:
+                        sync_status.info("⚙️ Applying timing adjustments...")
+            
             output_video_path = video_processor.replace_audio(
                 video_path, 
                 tts_audio_path, 
                 temp_dir,
-                sync_method=sync_method
+                sync_method=sync_method,
+                progress_callback=sync_progress_callback
             )
-            progress_bar.progress(100)
+            smart_progress_bar.progress(100)
+            
+            if sync_method == "smart":
+                sync_status.success("✅ Smart synchronization complete!")
+            else:
+                sync_status.success("✅ Audio synchronization complete!")
+            
             st.success("✅ Video processing complete!")
             
             # Store result
