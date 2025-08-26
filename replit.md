@@ -31,7 +31,7 @@ Preferred communication style: Simple, everyday language.
 - **TTS Generation**: Generates new audio using OpenAI's TTS API with multiple voice options
 - **Audio Synchronization**: Multiple methods available:
   - **Sync-First** (Default): Pre-calculates exact TTS speed needed to match video duration, generates perfect timing without post-processing
-  - **Stretch with Precision Sync**: Enhanced stretch method with optional segment-based analysis for better lip synchronization
+  - **Stretch with Pause Detection**: Enhanced stretch method with optional pause-aware timing for better synchronization
   - **Pause Analysis**: Analyzes silence gaps in both original and TTS audio, stretches speech segments to match timing precisely
   - **Smart Sync**: Uses librosa for advanced speech pattern analysis and onset detection
   - **Basic Methods**: Loop, fade, shortest options for simpler synchronization

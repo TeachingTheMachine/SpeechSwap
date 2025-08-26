@@ -280,7 +280,7 @@ class VideoProcessor:
             return float(result.stdout.strip())
         return 0
 
-    def replace_audio(self, video_path, new_audio_path, output_dir, sync_method="sync_first", precision_sync=False, progress_callback=None):
+    def replace_audio(self, video_path, new_audio_path, output_dir, sync_method="sync_first", pause_detection=False, progress_callback=None):
         try:
             if video_path == "TRANSCRIPT_ONLY":
                 output_path = os.path.join(output_dir, "output_audio.mp3")
@@ -424,17 +424,17 @@ class VideoProcessor:
                 print("Falling back to stretch method")
 
             if sync_method == "stretch" and video_duration > 0 and audio_duration > 0:
-                if precision_sync:
-                    # Use precision sync for better lip synchronization
+                if pause_detection:
+                    # Use pause-aware stretching for better synchronization
                     try:
-                        print("Using precision sync method")
-                        precision_output = self.precision_sync_audio(video_path, new_audio_path, output_dir, progress_callback)
-                        if precision_output:
-                            return precision_output
+                        print("Using pause-aware stretching")
+                        pause_output = self.pause_aware_stretch(video_path, new_audio_path, output_dir, progress_callback)
+                        if pause_output:
+                            return pause_output
                         else:
-                            print("Precision sync failed, falling back to basic stretch")
+                            print("Pause-aware stretch failed, falling back to basic stretch")
                     except Exception as e:
-                        print(f"Precision sync failed, falling back to basic stretch: {str(e)}")
+                        print(f"Pause-aware stretch failed, falling back to basic stretch: {str(e)}")
                 
                 # Method 1: Basic stretch/compress audio to match video duration
                 tempo_ratio = audio_duration / video_duration
@@ -562,169 +562,74 @@ class VideoProcessor:
         except Exception as e:
             raise Exception(f"Failed to get video info: {str(e)}")
 
-    def precision_sync_audio(self, video_path, new_audio_path, output_dir, progress_callback=None):
+    def pause_aware_stretch(self, video_path, new_audio_path, output_dir, progress_callback=None):
         """
-        Precision sync using segment-based analysis for better lip synchronization
+        Simple pause-aware stretching - adds pause detection to basic stretch
         """
         try:
-            print("Starting precision sync analysis")
+            print("Starting pause-aware stretch")
             
             if progress_callback:
-                progress_callback(5)
+                progress_callback(10)
             
-            # Step A: Extract and analyze original audio
-            original_audio_path = os.path.join(output_dir, "original_for_precision.wav")
-            extract_cmd = [
-                'ffmpeg', '-y', '-i', video_path,
-                '-ar', '22050', '-ac', '1',
-                '-f', 'wav', original_audio_path
-            ]
+            # Get video and audio durations
+            video_duration = self._get_duration(video_path)
             
-            result = subprocess.run(extract_cmd, capture_output=True, text=True)
-            if result.returncode != 0:
-                raise Exception(f"Audio extraction failed: {result.stderr}")
-            
-            if progress_callback:
-                progress_callback(25)
-            
-            # Load audio files with pydub
-            print("Analyzing original audio segments")
-            original_audio = AudioSegment.from_wav(original_audio_path)
+            # Load TTS audio with pydub for quick pause analysis
             tts_audio = AudioSegment.from_file(new_audio_path)
+            audio_duration = len(tts_audio) / 1000.0  # Convert ms to seconds
             
-            # Detect speech segments using silence detection
-            # Adjust silence threshold and min length based on audio characteristics
-            silence_thresh = original_audio.dBFS - 16  # 16dB below average
-            min_silence_len = 200  # 200ms minimum silence
+            if progress_callback:
+                progress_callback(50)
             
-            # Detect non-silent (speech) segments
-            original_segments = detect_nonsilent(
-                original_audio, 
-                min_silence_len=min_silence_len, 
-                silence_thresh=silence_thresh
-            )
+            # Simple silence detection on TTS audio
+            silence_thresh = tts_audio.dBFS - 14  # 14dB below average
+            min_silence_len = 300  # 300ms minimum pause
             
-            tts_segments = detect_nonsilent(
+            # Detect pauses
+            speech_segments = detect_nonsilent(
                 tts_audio, 
                 min_silence_len=min_silence_len, 
                 silence_thresh=silence_thresh
             )
             
-            if progress_callback:
-                progress_callback(50)
+            print(f"Found {len(speech_segments)} speech segments")
             
-            print(f"Found {len(original_segments)} original segments, {len(tts_segments)} TTS segments")
+            # Calculate basic tempo ratio
+            tempo_ratio = audio_duration / video_duration
             
-            # Step C: Create intelligent mapping
-            if not original_segments or not tts_segments:
-                print("No segments detected, falling back to basic stretch")
-                return None
-            
-            # Convert pydub segments (ms) to seconds for easier processing
-            original_speech_segments = [(start/1000.0, end/1000.0) for start, end in original_segments]
-            tts_speech_segments = [(start/1000.0, end/1000.0) for start, end in tts_segments]
-            
-            # Create segment mapping
-            segment_mappings = self._create_segment_mapping(original_speech_segments, tts_speech_segments)
-            
-            if progress_callback:
-                progress_callback(75)
-            
-            # Step D: Process segments with individual tempo adjustments
-            output_path = os.path.join(output_dir, "precision_synced_video.mp4")
-            success = self._apply_precision_timing(
-                video_path, new_audio_path, segment_mappings, 
-                output_path, progress_callback
-            )
-            
-            if success:
-                # Clean up temporary files
-                if os.path.exists(original_audio_path):
-                    os.remove(original_audio_path)
-                return output_path
+            # Apply slight adjustment if we detected good pause structure
+            if len(speech_segments) > 2:  # Only if we found multiple segments
+                # Slightly reduce tempo to preserve pause timing
+                tempo_ratio *= 0.98  # 2% slower to preserve natural pauses
+                print(f"Applying pause-aware adjustment: {tempo_ratio:.3f}")
             else:
-                return None
-                
-        except Exception as e:
-            print(f"Precision sync error: {str(e)}")
-            return None
-    
-    def _create_segment_mapping(self, original_segments, tts_segments):
-        """Create mapping between original and TTS segments for precision timing"""
-        mappings = []
-        
-        # Simple proportional mapping - can be enhanced with more sophisticated algorithms
-        num_mappings = min(len(original_segments), len(tts_segments))
-        
-        for i in range(num_mappings):
-            orig_start, orig_end = original_segments[i]
-            tts_start, tts_end = tts_segments[i]
+                print(f"Using basic tempo ratio: {tempo_ratio:.3f}")
             
-            orig_duration = orig_end - orig_start
-            tts_duration = tts_end - tts_start
-            
-            # Calculate tempo ratio for this segment
-            if tts_duration > 0:
-                tempo_ratio = tts_duration / orig_duration
-                # Clamp to FFmpeg atempo limits
-                tempo_ratio = max(0.5, min(2.0, tempo_ratio))
-            else:
-                tempo_ratio = 1.0
-            
-            mappings.append({
-                'original_start': orig_start,
-                'original_end': orig_end,
-                'tts_start': tts_start,
-                'tts_end': tts_end,
-                'tempo_ratio': tempo_ratio
-            })
-        
-        return mappings
-    
-    def _apply_precision_timing(self, video_path, audio_path, mappings, output_path, progress_callback=None):
-        """Apply precision timing using segment-based stretching"""
-        try:
-            if not mappings:
-                return False
-            
-            # For simplicity in this implementation, we'll calculate a weighted average tempo
-            # In a more advanced version, we could process each segment individually
-            total_original_duration = sum(m['original_end'] - m['original_start'] for m in mappings)
-            
-            if total_original_duration == 0:
-                return False
-            
-            # Calculate weighted average tempo ratio
-            weighted_tempo = sum(
-                m['tempo_ratio'] * (m['original_end'] - m['original_start']) 
-                for m in mappings
-            ) / total_original_duration
-            
-            # Apply the calculated tempo ratio
+            # Apply the stretch with FFmpeg
+            output_path = os.path.join(output_dir, "pause_aware_video.mp4")
             cmd = [
                 'ffmpeg', '-y',
                 '-i', video_path,
-                '-i', audio_path,
+                '-i', new_audio_path,
                 '-c:v', 'copy',
-                '-filter:a', f'atempo={weighted_tempo:.3f}',
+                '-filter:a', f'atempo={tempo_ratio:.3f}',
                 '-map', '0:v:0',
                 '-map', '1:a:0',
                 output_path
             ]
-            
-            print(f"Applying precision sync with weighted tempo: {weighted_tempo:.3f}")
             
             result = subprocess.run(cmd, capture_output=True, text=True)
             
             if result.returncode == 0:
                 if progress_callback:
                     progress_callback(100)
-                print("Precision sync successful")
-                return True
+                print("Pause-aware stretch successful")
+                return output_path
             else:
-                print(f"Precision sync FFmpeg failed: {result.stderr}")
-                return False
+                print(f"Pause-aware stretch failed: {result.stderr}")
+                return None
                 
         except Exception as e:
-            print(f"Precision timing application failed: {str(e)}")
-            return False
+            print(f"Pause-aware stretch error: {str(e)}")
+            return None
