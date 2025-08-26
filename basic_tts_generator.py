@@ -31,20 +31,8 @@ class BasicTTSGenerator:
             "shimmer": "Shimmer (Female, Soft)"
         }
     
-    def generate_speech(self, text, output_dir, voice="nova", speed=1.0, target_duration=None):
-        """
-        Generate speech from text using OpenAI TTS API
-        
-        Args:
-            text (str): Text to convert to speech
-            output_dir (str): Directory to save the audio file
-            voice (str): Voice name from OpenAI TTS
-            speed (float): Speed of speech (0.25 to 4.0)
-            target_duration (float): Target duration in seconds for automatic speed adjustment
-            
-        Returns:
-            str: Path to the generated audio file
-        """
+    def generate_tts(self, text, output_path, voice="nova", speed=1.0):
+        """Generate speech from text using OpenAI TTS API"""
         try:
             # Clean and prepare text
             cleaned_text = self._clean_text_for_tts(text)
@@ -52,7 +40,7 @@ class BasicTTSGenerator:
             if not cleaned_text.strip():
                 raise Exception("No valid text found for TTS generation")
             
-            output_path = os.path.join(output_dir, "tts_audio.mp3")
+            # Use provided output path directly
             
             # Check if OpenAI TTS is available
             if not self.openai_tts_available:
@@ -61,20 +49,6 @@ class BasicTTSGenerator:
             # Ensure voice is valid
             if voice not in self.available_voices:
                 voice = "nova"  # Default to Nova voice
-            
-            # Auto-adjust speed if target duration is provided
-            if target_duration:
-                # Estimate words per minute for the voice (approximate)
-                estimated_wpm = 150  # Average speaking rate
-                word_count = len(cleaned_text.split())
-                estimated_duration = (word_count / estimated_wpm) * 60
-                
-                if estimated_duration > 0:
-                    suggested_speed = estimated_duration / target_duration
-                    # Only use auto-adjustment if it's within reasonable bounds
-                    if 0.25 <= suggested_speed <= 4.0:
-                        speed = suggested_speed
-                        print(f"Auto-adjusted speed to {speed:.2f} for target duration {target_duration}s")
             
             # Clamp speed to valid range for OpenAI TTS
             speed = max(0.25, min(4.0, speed))
