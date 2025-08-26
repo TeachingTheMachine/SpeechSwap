@@ -223,8 +223,8 @@ class VideoProcessor:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info_dict = ydl.extract_info(youtube_url, download=False)
 
-                subtitles = info_dict.get('subtitles', {})
-                auto_captions = info_dict.get('automatic_captions', {})
+                subtitles = info_dict.get('subtitles') or {}
+                auto_captions = info_dict.get('automatic_captions') or {}
 
                 for lang in ['en', 'en-US', 'en-GB']:
                     if lang in subtitles:
@@ -273,7 +273,7 @@ class VideoProcessor:
             return float(result.stdout.strip())
         return 0
 
-    def replace_audio(self, video_path, new_audio_path, output_dir):
+    def replace_audio(self, video_path, new_audio_path, output_dir, sync_method="stretch"):
         try:
             if video_path == "TRANSCRIPT_ONLY":
                 output_path = os.path.join(output_dir, "output_audio.mp3")
@@ -285,22 +285,90 @@ class VideoProcessor:
             audio_duration = self._get_duration(new_audio_path)
 
             output_path = os.path.join(output_dir, "output_video.mp4")
+            
+            print(f"Video duration: {video_duration:.2f}s, Audio duration: {audio_duration:.2f}s")
 
-            cmd = [
-                'ffmpeg', '-y',
-                '-i', video_path,
-                '-i', new_audio_path,
-                '-c:v', 'copy',
-                '-map', '0:v:0',
-                '-map', '1:a:0',
-                '-shortest',
-                output_path
-            ]
+            if sync_method == "stretch" and video_duration > 0 and audio_duration > 0:
+                # Method 1: Stretch/compress audio to match video duration
+                tempo_ratio = audio_duration / video_duration
+                cmd = [
+                    'ffmpeg', '-y',
+                    '-i', video_path,
+                    '-i', new_audio_path,
+                    '-c:v', 'copy',
+                    '-filter:a', f'atempo={tempo_ratio:.3f}',
+                    '-map', '0:v:0',
+                    '-map', '1:a:0',
+                    output_path
+                ]
+                print(f"Using audio stretching with tempo ratio: {tempo_ratio:.3f}")
+                
+            elif sync_method == "loop" and video_duration > audio_duration:
+                # Method 2: Loop audio to match video duration
+                cmd = [
+                    'ffmpeg', '-y',
+                    '-i', video_path,
+                    '-stream_loop', '-1',
+                    '-i', new_audio_path,
+                    '-c:v', 'copy',
+                    '-map', '0:v:0',
+                    '-map', '1:a:0',
+                    '-shortest',
+                    output_path
+                ]
+                print("Using audio looping to match video duration")
+                
+            elif sync_method == "fade":
+                # Method 3: Fade audio in/out to match duration
+                if audio_duration < video_duration:
+                    # Pad with silence and fade
+                    cmd = [
+                        'ffmpeg', '-y',
+                        '-i', video_path,
+                        '-i', new_audio_path,
+                        '-c:v', 'copy',
+                        '-filter:a', f'apad=whole_dur={video_duration}',
+                        '-map', '0:v:0',
+                        '-map', '1:a:0',
+                        '-t', str(video_duration),
+                        output_path
+                    ]
+                else:
+                    # Fade out at video end
+                    fade_start = max(0, video_duration - 2)  # Start fade 2 seconds before end
+                    cmd = [
+                        'ffmpeg', '-y',
+                        '-i', video_path,
+                        '-i', new_audio_path,
+                        '-c:v', 'copy',
+                        '-filter:a', f'afade=t=out:st={fade_start}:d=2',
+                        '-map', '0:v:0',
+                        '-map', '1:a:0',
+                        '-t', str(video_duration),
+                        output_path
+                    ]
+                print(f"Using audio fade with video duration: {video_duration:.2f}s")
+            else:
+                # Default: Use shortest duration (original method)
+                cmd = [
+                    'ffmpeg', '-y',
+                    '-i', video_path,
+                    '-i', new_audio_path,
+                    '-c:v', 'copy',
+                    '-map', '0:v:0',
+                    '-map', '1:a:0',
+                    '-shortest',
+                    output_path
+                ]
+                print("Using shortest duration method")
 
             result = subprocess.run(cmd, capture_output=True, text=True)
 
             if result.returncode != 0:
                 raise Exception(f"FFmpeg failed: {result.stderr}")
+            
+            final_duration = self._get_duration(output_path)
+            print(f"Final video duration: {final_duration:.2f}s")
 
             return output_path
 

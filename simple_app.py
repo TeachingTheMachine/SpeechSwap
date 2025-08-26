@@ -67,6 +67,19 @@ def main():
         help="Adjust the speed of the generated speech"
     )
     
+    # Audio-Video Synchronization Method
+    sync_method = st.sidebar.selectbox(
+        "Audio-Video Sync Method",
+        options=["stretch", "auto_speed", "loop", "fade", "shortest"],
+        index=0,
+        help="Choose how to synchronize audio with video duration:\n"
+             "• Stretch: Adjust audio speed to match video length\\n"
+             "• Auto Speed: Automatically adjust TTS speed for target duration\\n" 
+             "• Loop: Repeat audio to fill video duration\\n"
+             "• Fade: Fade audio in/out to match duration\\n"
+             "• Shortest: Use shortest of audio/video duration"
+    )
+    
     # Main content area
     col1, col2 = st.columns([2, 1])
     
@@ -94,7 +107,10 @@ def main():
         if manual_text:
             word_count = len(manual_text.split())
             char_count = len(manual_text)
+            # Estimate speech duration (average 150 words per minute)
+            estimated_duration = (word_count / 150) * 60
             st.caption(f"📊 {word_count} words, {char_count} characters")
+            st.caption(f"⏱️ Estimated speech duration: {estimated_duration:.1f} seconds")
     
     with col2:
         st.header("Process")
@@ -110,7 +126,7 @@ def main():
         # Show button state clearly
         if uploaded_video and manual_text:
             if st.button("🚀 Start Processing", type="primary", use_container_width=True):
-                process_video_manual(uploaded_video, manual_text, tts_voice, speech_speed)
+                process_video_manual(uploaded_video, manual_text, tts_voice, speech_speed, sync_method)
         else:
             st.button("🚀 Start Processing", type="primary", use_container_width=True, disabled=True, help="Upload video and enter text first")
         
@@ -135,7 +151,7 @@ def main():
             st.session_state.output_video_path = None
             st.rerun()
 
-def process_video_manual(uploaded_video, manual_text, tts_voice, speech_speed):
+def process_video_manual(uploaded_video, manual_text, tts_voice, speech_speed, sync_method):
     """Process video with manual text input"""
     
     # Create temporary directory
@@ -162,13 +178,21 @@ def process_video_manual(uploaded_video, manual_text, tts_voice, speech_speed):
             progress_bar.progress(25)
             st.success("✅ Video saved successfully")
             
+            # Get video duration for auto-speed adjustment if needed
+            video_info = video_processor.get_video_info(video_path)
+            target_duration = video_info['duration'] if sync_method == "auto_speed" else None
+            
             # Step 2: Generate TTS audio from manual text
             st.info("🔄 Step 2: Generating TTS audio...")
+            if target_duration:
+                st.info(f"🎯 Target duration: {target_duration:.1f}s - Auto-adjusting speed...")
+            
             tts_audio_path = tts_generator.generate_speech(
                 manual_text, 
                 temp_dir, 
                 voice=tts_voice,
-                speed=speech_speed
+                speed=speech_speed,
+                target_duration=target_duration
             )
             progress_bar.progress(70)
             st.success("✅ TTS audio generated")
@@ -183,11 +207,12 @@ def process_video_manual(uploaded_video, manual_text, tts_voice, speech_speed):
                     st.audio(tts_audio_path, format='audio/mp3')
             
             # Step 3: Replace audio in video
-            st.info("🔄 Step 3: Combining video with new audio...")
+            st.info(f"🔄 Step 3: Combining video with new audio using '{sync_method}' method...")
             output_video_path = video_processor.replace_audio(
                 video_path, 
                 tts_audio_path, 
-                temp_dir
+                temp_dir,
+                sync_method=sync_method
             )
             progress_bar.progress(100)
             st.success("✅ Video processing complete!")
