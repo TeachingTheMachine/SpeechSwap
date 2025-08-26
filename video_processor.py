@@ -26,6 +26,7 @@ from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 from audio_synchronizer import AudioSynchronizer
 from pause_sync import PauseSync
+from sync_first_tts import SyncFirstTTS
 
 class VideoProcessor:
 
@@ -35,6 +36,7 @@ class VideoProcessor:
         self.oauth_creds = None
         self.audio_sync = AudioSynchronizer()
         self.pause_sync = PauseSync()
+        self.sync_first_tts = None  # Initialize when needed
 
     def extract_video_id(self, youtube_url):
         patterns = [
@@ -277,7 +279,7 @@ class VideoProcessor:
             return float(result.stdout.strip())
         return 0
 
-    def replace_audio(self, video_path, new_audio_path, output_dir, sync_method="pause_analysis", progress_callback=None):
+    def replace_audio(self, video_path, new_audio_path, output_dir, sync_method="sync_first", progress_callback=None):
         try:
             if video_path == "TRANSCRIPT_ONLY":
                 output_path = os.path.join(output_dir, "output_audio.mp3")
@@ -292,8 +294,38 @@ class VideoProcessor:
             
             print(f"Video duration: {video_duration:.2f}s, Audio duration: {audio_duration:.2f}s")
 
-            # Try pause analysis sync first (default method)
-            if sync_method == "pause_analysis":
+            # Sync-first method is handled during TTS generation, just combine
+            if sync_method == "sync_first":
+                print("Using sync-first method (audio already generated at correct speed)")
+                if progress_callback:
+                    progress_callback(50)
+                
+                # Direct combination - no post-processing needed
+                cmd = [
+                    'ffmpeg', '-y',
+                    '-i', video_path,
+                    '-i', new_audio_path,
+                    '-c:v', 'copy',
+                    '-map', '0:v:0',
+                    '-map', '1:a:0',
+                    '-shortest',
+                    output_path
+                ]
+                
+                result = subprocess.run(cmd, capture_output=True, text=True)
+                
+                if result.returncode == 0:
+                    if progress_callback:
+                        progress_callback(100)
+                    final_duration = self._get_duration(output_path)
+                    print(f"Sync-first method successful! Final duration: {final_duration:.2f}s")
+                    return output_path
+                else:
+                    print(f"Video combination failed: {result.stderr}")
+                    raise Exception(f"Failed to combine video with sync-first audio: {result.stderr}")
+            
+            # Try pause analysis sync as backup
+            elif sync_method == "pause_analysis":
                 try:
                     print("Using pause-based audio synchronization")
                     if progress_callback:

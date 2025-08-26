@@ -7,6 +7,7 @@ import traceback
 
 from video_processor import VideoProcessor
 from basic_tts_generator import BasicTTSGenerator
+from sync_first_tts import SyncFirstTTS
 
 # Configure page
 st.set_page_config(
@@ -70,9 +71,10 @@ def main():
     # Audio Synchronization Method
     sync_method = st.sidebar.selectbox(
         "Audio Sync Method",
-        options=["pause_analysis", "smart", "stretch", "auto_speed", "loop", "fade", "shortest"],
+        options=["sync_first", "pause_analysis", "smart", "stretch", "auto_speed", "loop", "fade", "shortest"],
         index=0,
         help="Choose synchronization method:\n"
+             "• Sync-First: Calculate exact TTS speed upfront for perfect timing (RECOMMENDED)\n"
              "• Pause Analysis: Analyzes pauses in both audio files for precise timing\n"
              "• Smart: Advanced speech pattern analysis\n"
              "• Stretch: Simple time stretching\n"
@@ -80,8 +82,10 @@ def main():
              "• Loop/Fade/Shortest: Basic methods"
     )
     
-    if sync_method == "pause_analysis":
-        st.sidebar.info("🎯 Pause Analysis: Detects silence gaps in original and TTS audio, then stretches speech segments to match timing precisely.")
+    if sync_method == "sync_first":
+        st.sidebar.success("🎯 Sync-First: Calculates exact TTS speed needed upfront. No post-processing = perfect quality!")
+    elif sync_method == "pause_analysis":
+        st.sidebar.info("🔍 Pause Analysis: Detects silence gaps in original and TTS audio, then stretches speech segments to match timing precisely.")
     elif sync_method == "smart":
         st.sidebar.info("🧠 Smart Sync: Advanced analysis using speech patterns and energy detection.")
     else:
@@ -190,19 +194,62 @@ def process_video_manual(uploaded_video, manual_text, tts_voice, speech_speed, s
             target_duration = video_info['duration'] if sync_method == "auto_speed" else None
             
             # Step 2: Generate TTS audio from manual text
-            st.info("🔄 Step 2: Generating TTS audio...")
-            if target_duration:
-                st.info(f"🎯 Target duration: {target_duration:.1f}s - Auto-adjusting speed...")
-            
-            tts_audio_path = tts_generator.generate_speech(
-                manual_text, 
-                temp_dir, 
-                voice=tts_voice,
-                speed=speech_speed,
-                target_duration=target_duration
-            )
-            progress_bar.progress(70)
-            st.success("✅ TTS audio generated")
+            if sync_method == "sync_first":
+                st.info("🔄 Step 2: Calculating optimal TTS speed and generating audio...")
+                
+                # Initialize sync-first TTS
+                api_key = os.environ.get("OPENAI_API_KEY")
+                if not api_key:
+                    st.error("OpenAI API key not found. Please add your API key to environment variables.")
+                    st.stop()
+                
+                sync_first_generator = SyncFirstTTS(api_key)
+                
+                # Get video duration
+                video_duration = video_processor._get_duration(video_path)
+                
+                # Show speed calculation info
+                speed_info = sync_first_generator.get_speed_info(manual_text, video_duration)
+                
+                with st.expander("📊 Speed Calculation Details", expanded=False):
+                    st.write(f"**Text Analysis:**")
+                    st.write(f"- Words: {speed_info['word_count']}")
+                    st.write(f"- Natural duration: {speed_info['natural_duration']:.1f}s")
+                    st.write(f"- Target duration: {speed_info['target_duration']:.1f}s")
+                    st.write(f"- Required speed: {speed_info['required_speed']:.2f}x")
+                    
+                    if speed_info['is_feasible']:
+                        st.success(f"✅ {speed_info['recommendation']}")
+                    else:
+                        st.warning(f"⚠️ {speed_info['recommendation']}")
+                
+                # Generate TTS at calculated speed
+                try:
+                    tts_audio_path, actual_speed = sync_first_generator.generate_sync_first_tts(
+                        text=manual_text,
+                        target_duration=video_duration,
+                        voice=tts_voice,
+                        output_path=os.path.join(temp_dir, "sync_first_audio.mp3")
+                    )
+                    progress_bar.progress(70)
+                    st.success(f"✅ Sync-first TTS generated at {actual_speed:.2f}x speed!")
+                except Exception as e:
+                    st.error(f"❌ Sync-first TTS generation failed: {str(e)}")
+                    st.stop()
+            else:
+                st.info("🔄 Step 2: Generating TTS audio...")
+                if target_duration:
+                    st.info(f"🎯 Target duration: {target_duration:.1f}s - Auto-adjusting speed...")
+                
+                tts_audio_path = tts_generator.generate_speech(
+                    manual_text, 
+                    temp_dir, 
+                    voice=tts_voice,
+                    speed=speech_speed,
+                    target_duration=target_duration
+                )
+                progress_bar.progress(70)
+                st.success("✅ TTS audio generated")
             
             # Show text preview
             with st.expander("📝 Text Used for TTS", expanded=False):
@@ -214,7 +261,11 @@ def process_video_manual(uploaded_video, manual_text, tts_voice, speech_speed, s
                     st.audio(tts_audio_path, format='audio/mp3')
             
             # Step 3: Replace audio in video
-            if sync_method == "pause_analysis":
+            if sync_method == "sync_first":
+                st.info("🔄 Step 3: Combining video with perfectly timed audio...")
+                sync_status = st.empty()
+                sync_status.info("🎯 No post-processing needed - audio already matches video duration!")
+            elif sync_method == "pause_analysis":
                 st.info("🔄 Step 3: Pause Analysis - analyzing silence gaps in both audio files...")
                 sync_status = st.empty()
                 sync_status.info("🎯 Using pause analysis for precise timing synchronization")
@@ -230,7 +281,9 @@ def process_video_manual(uploaded_video, manual_text, tts_voice, speech_speed, s
             sync_progress_bar = st.progress(70)
             def sync_progress_callback(p):
                 sync_progress_bar.progress(70 + int(p * 0.3))
-                if sync_method == "pause_analysis" and p < 100:
+                if sync_method == "sync_first" and p < 100:
+                    sync_status.info("🚀 Combining perfectly timed audio with video...")
+                elif sync_method == "pause_analysis" and p < 100:
                     if p < 15:
                         sync_status.info("🔊 Extracting original audio...")
                     elif p < 40:
@@ -260,7 +313,9 @@ def process_video_manual(uploaded_video, manual_text, tts_voice, speech_speed, s
             )
             sync_progress_bar.progress(100)
             
-            if sync_method == "pause_analysis":
+            if sync_method == "sync_first":
+                sync_status.success("✅ Perfect sync achieved with no quality loss!")
+            elif sync_method == "pause_analysis":
                 sync_status.success("✅ Pause analysis synchronization complete!")
             elif sync_method == "smart":
                 sync_status.success("✅ Smart synchronization complete!")

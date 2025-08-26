@@ -30,7 +30,8 @@ Preferred communication style: Simple, everyday language.
 - **Speech Transcription**: Leverages OpenAI's Whisper API for accurate speech-to-text conversion
 - **TTS Generation**: Generates new audio using OpenAI's TTS API with multiple voice options
 - **Audio Synchronization**: Multiple methods available:
-  - **Pause Analysis** (Default): Analyzes silence gaps in both original and TTS audio, stretches speech segments to match timing precisely
+  - **Sync-First** (Default): Pre-calculates exact TTS speed needed to match video duration, generates perfect timing without post-processing
+  - **Pause Analysis**: Analyzes silence gaps in both original and TTS audio, stretches speech segments to match timing precisely
   - **Smart Sync**: Uses librosa for advanced speech pattern analysis and onset detection
   - **Basic Methods**: Stretch, loop, fade options for simpler synchronization
 - **Final Assembly**: Combines original video with synchronized TTS audio using FFmpeg
