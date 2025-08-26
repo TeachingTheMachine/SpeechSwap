@@ -291,20 +291,11 @@ class VideoProcessor:
                 '-i', video_path,
                 '-i', new_audio_path,
                 '-c:v', 'copy',
-                '-c:a', 'aac',
                 '-map', '0:v:0',
                 '-map', '1:a:0',
+                '-shortest',
+                output_path
             ]
-
-            if abs(audio_duration - video_duration) > 0.1:
-                if audio_duration > video_duration:
-                    cmd.extend(['-t', str(video_duration)])
-                    st.warning(f"⚠️ Audio was longer than video. Trimmed to {video_duration:.1f} seconds.")
-                else:
-                    cmd.extend(['-stream_loop', '-1', '-t', str(video_duration)])
-                    st.warning(f"⚠️ Audio was shorter than video. Extended to {video_duration:.1f} seconds.")
-
-            cmd.append(output_path)
 
             result = subprocess.run(cmd, capture_output=True, text=True)
 
