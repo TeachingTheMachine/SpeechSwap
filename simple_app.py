@@ -121,40 +121,49 @@ def main():
             help="Upload the video file that you want to replace audio for"
         )
         
-        # Video preview section
+        # Video thumbnail preview
         if uploaded_video is not None:
             st.markdown("---")
-            st.subheader("📹 Video Preview")
+            st.subheader("📹 Video Thumbnail")
             
-            # Create expandable video preview
-            with st.expander("Click to view uploaded video", expanded=False):
+            try:
+                # Save uploaded video temporarily
+                temp_video_path = os.path.join(tempfile.gettempdir(), f"preview_{uploaded_video.name}")
+                with open(temp_video_path, "wb") as f:
+                    f.write(uploaded_video.getbuffer())
+                
+                # Generate thumbnail image using FFmpeg
+                thumbnail_path = os.path.join(tempfile.gettempdir(), f"thumb_{uploaded_video.name}.jpg")
+                import subprocess
+                cmd = [
+                    'ffmpeg', '-i', temp_video_path, '-ss', '00:00:01', '-vframes', '1', 
+                    '-y', thumbnail_path
+                ]
+                result = subprocess.run(cmd, capture_output=True, text=True)
+                
+                if result.returncode == 0 and os.path.exists(thumbnail_path):
+                    # Display thumbnail image
+                    st.image(thumbnail_path, caption=f"Frame from {uploaded_video.name}", width=400)
+                else:
+                    st.info("Could not generate video thumbnail")
+                
+                # Show video info
+                file_size = len(uploaded_video.getbuffer()) / (1024 * 1024)  # Size in MB
+                st.caption(f"📄 File: {uploaded_video.name}")
+                st.caption(f"💾 Size: {file_size:.1f} MB")
+                
+                # Get video duration
                 try:
-                    # Save uploaded video temporarily for preview
-                    temp_video_path = os.path.join(tempfile.gettempdir(), f"preview_{uploaded_video.name}")
-                    with open(temp_video_path, "wb") as f:
-                        f.write(uploaded_video.getbuffer())
+                    cmd = ['ffprobe', '-v', 'quiet', '-show_entries', 'format=duration', '-of', 'csv=p=0', temp_video_path]
+                    result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+                    if result.returncode == 0 and result.stdout.strip():
+                        duration = float(result.stdout.strip())
+                        st.caption(f"⏱️ Duration: {duration:.1f} seconds")
+                except Exception:
+                    pass
                     
-                    # Display video with controls
-                    st.video(temp_video_path)
-                    
-                    # Show video info
-                    file_size = len(uploaded_video.getbuffer()) / (1024 * 1024)  # Size in MB
-                    st.caption(f"📄 File: {uploaded_video.name}")
-                    st.caption(f"💾 Size: {file_size:.1f} MB")
-                    
-                    # Get video duration if possible
-                    try:
-                        import subprocess
-                        cmd = ['ffprobe', '-v', 'quiet', '-show_entries', 'format=duration', '-of', 'csv=p=0', temp_video_path]
-                        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
-                        if result.returncode == 0 and result.stdout.strip():
-                            duration = float(result.stdout.strip())
-                            st.caption(f"⏱️ Duration: {duration:.1f} seconds")
-                    except Exception:
-                        pass  # Duration detection failed, continue without it
-                    
-                except Exception as e:
-                    st.error(f"Could not preview video: {str(e)}")
+            except Exception as e:
+                st.error(f"Could not process video: {str(e)}")
             
             st.markdown("---")
         
