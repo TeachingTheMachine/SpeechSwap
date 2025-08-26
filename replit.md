@@ -31,9 +31,10 @@ Preferred communication style: Simple, everyday language.
 - **TTS Generation**: Generates new audio using OpenAI's TTS API with multiple voice options
 - **Audio Synchronization**: Multiple methods available:
   - **Sync-First** (Default): Pre-calculates exact TTS speed needed to match video duration, generates perfect timing without post-processing
+  - **Stretch with Precision Sync**: Enhanced stretch method with optional segment-based analysis for better lip synchronization
   - **Pause Analysis**: Analyzes silence gaps in both original and TTS audio, stretches speech segments to match timing precisely
   - **Smart Sync**: Uses librosa for advanced speech pattern analysis and onset detection
-  - **Basic Methods**: Stretch, loop, fade options for simpler synchronization
+  - **Basic Methods**: Loop, fade, shortest options for simpler synchronization
 - **Final Assembly**: Combines original video with synchronized TTS audio using FFmpeg
 
 ## Data Flow
@@ -50,7 +51,7 @@ Preferred communication style: Simple, everyday language.
 - **Streamlit**: Web application framework for the user interface
 - **MoviePy**: Video and audio processing, editing, and manipulation
 - **PyTube**: YouTube video downloading functionality
-- **PyDub**: Audio file format conversion and processing
+- **PyDub**: Audio file format conversion and processing, silence detection for precision sync
 
 ## AI/ML Services
 - **OpenAI API**: 

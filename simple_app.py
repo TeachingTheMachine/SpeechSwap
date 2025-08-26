@@ -91,6 +91,20 @@ def main():
     else:
         st.sidebar.info(f"📝 Using {sync_method} method for audio synchronization.")
     
+    # Precision Sync Enhancement Option
+    precision_sync = False
+    if sync_method == "stretch":
+        st.sidebar.markdown("---")
+        precision_sync = st.sidebar.checkbox(
+            "Enable Precision Sync", 
+            value=False,
+            help="Analyzes speech patterns for better lip sync (slower processing)"
+        )
+        if precision_sync:
+            st.sidebar.info("🎯 Precision Sync: Segment-based stretching for improved lip synchronization")
+        else:
+            st.sidebar.info("⚡ Basic Stretch: Fast uniform time stretching")
+    
     # Main content area
     col1, col2 = st.columns([2, 1])
     
@@ -137,7 +151,7 @@ def main():
         # Show button state clearly
         if uploaded_video and manual_text:
             if st.button("🚀 Start Processing", type="primary", use_container_width=True):
-                process_video_manual(uploaded_video, manual_text, tts_voice, speech_speed, sync_method)
+                process_video_manual(uploaded_video, manual_text, tts_voice, speech_speed, sync_method, precision_sync)
         else:
             st.button("🚀 Start Processing", type="primary", use_container_width=True, disabled=True, help="Upload video and enter text first")
         
@@ -162,7 +176,7 @@ def main():
             st.session_state.output_video_path = None
             st.rerun()
 
-def process_video_manual(uploaded_video, manual_text, tts_voice, speech_speed, sync_method):
+def process_video_manual(uploaded_video, manual_text, tts_voice, speech_speed, sync_method, precision_sync=False):
     """Process video with manual text input"""
     
     # Create temporary directory
@@ -265,6 +279,10 @@ def process_video_manual(uploaded_video, manual_text, tts_voice, speech_speed, s
                 st.info("🔄 Step 3: Combining video with perfectly timed audio...")
                 sync_status = st.empty()
                 sync_status.info("🎯 No post-processing needed - audio already matches video duration!")
+            elif sync_method == "stretch" and precision_sync:
+                st.info("🔄 Step 3: Precision Sync - analyzing speech patterns for better lip sync...")
+                sync_status = st.empty()
+                sync_status.info("🎯 Using segment-based stretching for improved synchronization")
             elif sync_method == "pause_analysis":
                 st.info("🔄 Step 3: Pause Analysis - analyzing silence gaps in both audio files...")
                 sync_status = st.empty()
@@ -283,6 +301,15 @@ def process_video_manual(uploaded_video, manual_text, tts_voice, speech_speed, s
                 sync_progress_bar.progress(70 + int(p * 0.3))
                 if sync_method == "sync_first" and p < 100:
                     sync_status.info("🚀 Combining perfectly timed audio with video...")
+                elif sync_method == "stretch" and precision_sync and p < 100:
+                    if p < 25:
+                        sync_status.info("🔊 Extracting original audio for analysis...")
+                    elif p < 50:
+                        sync_status.info("📊 Analyzing speech segments in both audio files...")
+                    elif p < 75:
+                        sync_status.info("⚙️ Processing individual segments with precise timing...")
+                    else:
+                        sync_status.info("🔗 Reassembling segments with perfect timing...")
                 elif sync_method == "pause_analysis" and p < 100:
                     if p < 15:
                         sync_status.info("🔊 Extracting original audio...")
@@ -309,12 +336,15 @@ def process_video_manual(uploaded_video, manual_text, tts_voice, speech_speed, s
                 tts_audio_path, 
                 temp_dir,
                 sync_method=sync_method,
+                precision_sync=precision_sync,
                 progress_callback=sync_progress_callback
             )
             sync_progress_bar.progress(100)
             
             if sync_method == "sync_first":
                 sync_status.success("✅ Perfect sync achieved with no quality loss!")
+            elif sync_method == "stretch" and precision_sync:
+                sync_status.success("✅ Precision sync complete - enhanced lip synchronization!")
             elif sync_method == "pause_analysis":
                 sync_status.success("✅ Pause analysis synchronization complete!")
             elif sync_method == "smart":
