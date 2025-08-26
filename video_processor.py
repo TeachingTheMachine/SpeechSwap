@@ -4,9 +4,9 @@
 ║                                                                              ║
 ║  Author: Vanessa Crosby                                                      ║
 ║  Date Created: August 23, 2025                                              ║
-║  File Purpose: YouTube transcript extraction with OAuth authentication      ║
-║  Date Modified: August 23, 2025 5:15 PM                                     ║
-║  Mod Purpose: Added OAuth flow for YouTube Data API caption downloads       ║
+║  File Purpose: Video processing and transcript extraction                   ║
+║  Date Modified: August 26, 2025                                             ║
+║  Mod Purpose: Video SpeechSwap - audio replacement and synchronization     ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 """
 
@@ -39,7 +39,7 @@ class VideoProcessor:
         self.pause_sync = PauseSync()
         self.sync_first_tts = None  # Initialize when needed
 
-    def extract_video_id(self, youtube_url):
+    def extract_video_id(self, video_url):
         patterns = [
             r'(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)',
             r'youtube\.com\/embed\/([^&\n?#]+)',
@@ -47,7 +47,7 @@ class VideoProcessor:
         ]
 
         for pattern in patterns:
-            match = re.search(pattern, youtube_url)
+            match = re.search(pattern, video_url)
             if match:
                 return match.group(1)
 
@@ -86,12 +86,12 @@ class VideoProcessor:
         except Exception as e:
             raise Exception(f"OAuth authentication failed: {str(e)}")
 
-    def get_youtube_transcript_oauth(self, youtube_url):
+    def get_video_transcript_oauth(self, video_url):
         if not self.youtube_service:
             raise Exception("OAuth authentication required. Please authenticate first.")
 
         try:
-            video_id = self.extract_video_id(youtube_url)
+            video_id = self.extract_video_id(video_url)
 
             captions_response = self.youtube_service.captions().list(
                 part='snippet',
@@ -122,11 +122,11 @@ class VideoProcessor:
             return self._clean_transcript(transcript_text)
 
         except Exception as e:
-            raise Exception(f"YouTube OAuth API failed: {str(e)}")
+            raise Exception(f"Video OAuth API failed: {str(e)}")
 
-    def get_youtube_transcript_official_api(self, youtube_url):
+    def get_video_transcript_official_api(self, video_url):
         try:
-            video_id = self.extract_video_id(youtube_url)
+            video_id = self.extract_video_id(video_url)
             api_key = os.environ.get('YOUTUBE_API_KEY')
 
             if not api_key:
@@ -144,7 +144,7 @@ class VideoProcessor:
             captions_data = response.json()
 
             if not captions_data.get('items'):
-                raise Exception("No captions found for this video via YouTube Data API")
+                raise Exception("No captions found for this video via Video Data API")
 
             caption_id = None
             for caption in captions_data['items']:
@@ -170,7 +170,7 @@ class VideoProcessor:
             return self._clean_transcript(transcript_text)
 
         except Exception as e:
-            raise Exception(f"YouTube Data API failed: {str(e)}")
+            raise Exception(f"Video Data API failed: {str(e)}")
 
     def _parse_srt_to_text(self, srt_content):
         lines = srt_content.strip().split('\n')
@@ -183,9 +183,9 @@ class VideoProcessor:
 
         return ' '.join(text_lines)
 
-    def get_youtube_transcript(self, youtube_url):
+    def get_video_transcript(self, video_url):
         try:
-            video_id = self.extract_video_id(youtube_url)
+            video_id = self.extract_video_id(video_url)
             ytt_api = YouTubeTranscriptApi()
             transcript_list = ytt_api.list(video_id)
 
@@ -204,7 +204,7 @@ class VideoProcessor:
             return full_transcript
 
         except Exception as e:
-            return self._fallback_transcript_extraction(youtube_url)
+            return self._fallback_transcript_extraction(video_url)
 
     def _clean_transcript(self, transcript):
         transcript = re.sub(r'\s+', ' ', transcript)
@@ -215,9 +215,9 @@ class VideoProcessor:
         transcript = transcript.replace(' er ', ' ')
         return transcript.strip()
 
-    def _fallback_transcript_extraction(self, youtube_url):
+    def _fallback_transcript_extraction(self, video_url):
         try:
-            video_id = self.extract_video_id(youtube_url)
+            video_id = self.extract_video_id(video_url)
 
             ydl_opts = {
                 'writesubtitles': True,
@@ -228,7 +228,7 @@ class VideoProcessor:
             }
 
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info_dict = ydl.extract_info(youtube_url, download=False)
+                info_dict = ydl.extract_info(video_url, download=False)
 
                 subtitles = info_dict.get('subtitles') if info_dict.get('subtitles') is not None else {}
                 auto_captions = info_dict.get('automatic_captions') if info_dict.get('automatic_captions') is not None else {}
@@ -260,8 +260,8 @@ class VideoProcessor:
         except Exception:
             return "Error processing subtitle formats"
 
-    def download_youtube_video(self, url, output_dir):
-        transcript = self.get_youtube_transcript(url)
+    def download_video(self, url, output_dir):
+        transcript = self.get_video_transcript(url)
         transcript_path = os.path.join(output_dir, "transcript.txt")
         with open(transcript_path, 'w', encoding='utf-8') as f:
             f.write(transcript)

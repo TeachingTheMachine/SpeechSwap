@@ -11,7 +11,7 @@ from sync_first_tts import SyncFirstTTS
 
 # Configure page
 st.set_page_config(
-    page_title="YouTube Voice Replacement - Simple Version",
+    page_title="Video SpeechSwap",
     page_icon="🎬",
     layout="wide"
 )
@@ -31,7 +31,7 @@ def cleanup_temp_files():
         st.session_state.temp_dir = None
 
 def main():
-    st.title("🎬 YouTube Voice Replacement - Simple Version")
+    st.title("🎬 Video SpeechSwap")
     st.markdown("""
     Replace video audio with AI-generated speech using **OpenAI Text-to-Speech**.
     Paste your text and choose from high-quality voices to replace the video's audio.

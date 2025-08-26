@@ -1,6 +1,6 @@
 # Overview
 
-This is a YouTube Voice Replacement application built with Streamlit that allows users to replace the original audio in YouTube videos with AI-generated text-to-speech (TTS) audio. The application downloads YouTube videos, extracts their audio, transcribes the speech to text using OpenAI's Whisper API, and then generates new speech using OpenAI's TTS API with selectable voices. The final output is a video with the original visuals but replaced audio that maintains synchronization.
+This is a Video SpeechSwap application built with Streamlit that allows users to replace the original audio in videos with AI-generated text-to-speech (TTS) audio. The application processes video files, extracts their audio, transcribes the speech to text using OpenAI's Whisper API, and then generates new speech using OpenAI's TTS API with selectable voices. The final output is a video with the original visuals but replaced audio that maintains synchronization.
 
 # User Preferences
 
@@ -12,11 +12,11 @@ Preferred communication style: Simple, everyday language.
 - **Streamlit Web Interface**: Single-page application with a clean, intuitive UI
 - **Session State Management**: Uses Streamlit's session state to track processing status, output paths, and temporary directories
 - **Interactive Controls**: Sidebar with voice selection dropdown and speed adjustment controls
-- **File Upload/URL Input**: Supports both YouTube URL input and direct video file uploads
+- **File Upload/URL Input**: Supports direct video file uploads and URL input for various platforms
 
 ## Backend Architecture
 - **Modular Component Design**: Separated into distinct classes for different responsibilities:
-  - `VideoProcessor`: Handles YouTube video downloading and video file operations
+  - `VideoProcessor`: Handles video downloading and video file operations
   - `AudioUtils`: Manages audio extraction from videos and transcription
   - `TTSGenerator`: Handles text-to-speech generation with voice customization
   - `AudioSynchronizer`: Advanced speech pattern analysis for lip sync using librosa
@@ -25,7 +25,7 @@ Preferred communication style: Simple, everyday language.
 - **Error Handling**: Comprehensive exception handling with user-friendly error messages
 
 ## Processing Pipeline
-- **Video Acquisition**: Downloads YouTube videos using `pytube` or accepts uploaded files
+- **Video Acquisition**: Accepts uploaded video files or can download from URLs using `yt-dlp`
 - **Audio Extraction**: Uses `moviepy` to separate audio tracks from video files
 - **Speech Transcription**: Leverages OpenAI's Whisper API for accurate speech-to-text conversion
 - **TTS Generation**: Generates new audio using OpenAI's TTS API with multiple voice options
@@ -38,7 +38,7 @@ Preferred communication style: Simple, everyday language.
 - **Final Assembly**: Combines original video with synchronized TTS audio using FFmpeg
 
 ## Data Flow
-1. User inputs YouTube URL or uploads video file
+1. User uploads video file or inputs video URL
 2. Video downloaded/processed and audio extracted
 3. Audio transcribed to text using Whisper API
 4. Text converted to speech using TTS API with selected voice and speed
@@ -50,7 +50,7 @@ Preferred communication style: Simple, everyday language.
 ## Core Libraries
 - **Streamlit**: Web application framework for the user interface
 - **MoviePy**: Video and audio processing, editing, and manipulation
-- **PyTube**: YouTube video downloading functionality
+- **yt-dlp**: Video downloading functionality for various platforms
 - **PyDub**: Audio file format conversion and processing, silence detection for precision sync
 
 ## AI/ML Services
@@ -71,6 +71,6 @@ Preferred communication style: Simple, everyday language.
 
 ## System Requirements
 - **Temporary Storage**: Local file system access for processing temporary files
-- **Network Access**: Required for YouTube video downloads and OpenAI API calls
+- **Network Access**: Required for video downloads and OpenAI API calls
 - **Memory Management**: Handles video processing in memory with cleanup routines
 - **Caching System**: Stores audio analysis results to avoid re-processing identical videos
