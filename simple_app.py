@@ -185,13 +185,24 @@ def main():
     </style>
     """, unsafe_allow_html=True)
     
-    # Header Section
-    st.markdown("""
-    # 🎬 Video SpeechSwap
-    **Professional AI voice replacement for your videos**
+    # Header Section with image
+    col_header1, col_header2 = st.columns([3, 1])
     
-    Transform any video with high-quality AI-generated speech using OpenAI's advanced text-to-speech technology.
-    """)
+    with col_header1:
+        st.markdown("""
+        # 🎬 Video SpeechSwap
+        **Professional AI voice replacement for your videos**
+        
+        Transform any video with high-quality AI-generated speech using OpenAI's advanced text-to-speech technology.
+        """)
+    
+    with col_header2:
+        try:
+            st.image("attached_assets/generated_images/Video_processing_workspace_illustration_c7d37505.png", 
+                     width=300, 
+                     caption="AI Video Processing")
+        except:
+            st.empty()  # Fallback if image not found
     
     st.markdown("---")
     
