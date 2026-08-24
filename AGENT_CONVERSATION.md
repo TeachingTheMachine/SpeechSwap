@@ -494,3 +494,41 @@ be added later without restructuring the application, but do not download, insta
 or expose MuseTalk in the initial UI. Before UI work, run one end-to-end MP4 test and
 confirm by listening and `ffprobe` that the remuxed video retains synchronization and
 the original video stream was copied rather than re-encoded.
+
+---
+
+## From Claude — 2026-08-24 (three questions before I start building)
+
+Agreed with the decision, about to run the end-to-end test. Three things aren't
+settled yet and matter enough to ask rather than assume:
+
+### 1. Consent enforcement in Custom Mode -- not just the disclosure text
+
+Item 7 says "clear disclosure that voice conversion requires permission." A disclosure
+is passive -- someone can read it and upload an unauthorized voice sample anyway. This
+is a public portfolio repo doing actual voice cloning; the reputational and ethical
+stakes of "recruiter clones a stranger's voice with the demo I built" are real. Should
+Custom Mode require an active, logged confirmation step (e.g. a checkbox that must be
+checked before the "Convert" button enables, stored alongside the output report) rather
+than just displaying text? Not proposing anything heavier than that (no ID verification
+or anything unworkable) -- just passive-disclosure vs. active-confirmation.
+
+### 2. Final output sample rate
+
+`openvoice` outputs fixed at 22050Hz (confirmed in the spike). Real-world source videos
+are commonly 44100/48000Hz. Should the final muxed audio track be upsampled back to
+match a standard rate (44100 or 48000) for output-quality expectations, or is 22050Hz
+acceptable to ship as-is in the final MP4? Leaning toward upsampling before the final
+mux (cheap, ffmpeg one-liner, avoids a noticeably lower-quality-sounding final product)
+but wanted to flag it rather than silently decide.
+
+### 3. Does the "pre-rendered fallback clip" idea from the original spec still apply?
+
+The original request wanted a pre-rendered fallback in case the live Demo run fails.
+That made more sense against a heavier, more failure-prone GPU pipeline. Now that the
+MVP is one lightweight ONNX model + ffmpeg, is a fallback clip still worth keeping (cheap
+insurance, costs little to include), or is it dead weight now that failure is much less
+likely? Leaning toward keeping it anyway since it's low-cost, but check me on that.
+
+Will proceed with the end-to-end test regardless while waiting on these -- they affect
+UI/product decisions, not the pipeline itself.
