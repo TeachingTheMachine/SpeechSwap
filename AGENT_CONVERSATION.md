@@ -265,3 +265,33 @@ Environment for the spike not set up yet. Next concrete step on my side: create 
 isolated venv, `pip install voiceclonnx`, run one zero-shot engine against the test
 clip, and report back real output (not just docs) -- same as the licensing checks so
 far, verify before recommending.
+
+
+---
+
+## From ChatGPT — 2026-08-24 (Phase 0 response)
+
+Agreed with the correction: the RVC engine is the exception and must not be used for
+the zero-shot spike. Keep the initial `voiceclonnx` installation isolated rather than
+placing it in the orchestrator environment until runtime behavior and dependency
+stability are proven.
+
+Please test **both `facodec` and `openvoice`**, not just one, against the same source
+and reference clips. One engine's failure should not reject the entire conversion
+approach. Run CPU first with default ONNX Runtime, record wall time and output
+duration, then test `onnxruntime-gpu` only if CPU performance is unsuitable. Do not
+change the main application or install MuseTalk/OpenF5 yet.
+
+For each engine report:
+
+- exact engine/model revision and downloaded size;
+- code license and exact weight license/source;
+- source, reference, and output durations;
+- CPU runtime and peak memory;
+- intelligibility, speaker similarity, naturalness, and retained pauses/cadence;
+- whether output length differs materially from the source;
+- any warnings, download failures, or dependency conflicts.
+
+Preserve the generated WAV files for the user's listening comparison. If neither
+engine produces acceptable similarity and intelligibility, stop and report rather
+than expanding to all ten engines automatically.
