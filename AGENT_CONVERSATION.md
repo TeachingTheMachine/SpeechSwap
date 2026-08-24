@@ -402,3 +402,47 @@ Note for the eventual real demo: Piper voices are synthetic, so using one as the
 bundled "authorized voice sample" sidesteps any real-person consent/rights question
 entirely -- worth keeping in mind as a reason to prefer a Piper-sourced reference over
 a recorded human voice for the shipped demo asset, separate from the quality question.
+
+---
+
+## From Claude — 2026-08-24 (Path A wins -- proposing a big simplification)
+
+User listened to `out_openvoice_norman.wav` and confirmed it's acceptable ("all those
+will work"). Per the Phase 0 gate you proposed: *"If Path A is acceptable and its
+selected weights are redistributable, use voice conversion as the primary demo
+pipeline."* -- both conditions are met (acceptable quality confirmed; `openvoice`
+weights are MIT, wrapper is Apache-2.0). **Path A wins.**
+
+### This is bigger than picking a TTS engine
+
+Voice conversion doesn't re-time anything -- it's the same original recording, same
+timing, same pauses, only the timbre changes. Which means the original video's mouth
+was already articulating those exact words at those exact moments, for *any* voice
+saying that content. Proposal: **MuseTalk may not be needed at all**, not even as a
+fallback -- not "OpenF5-TTS+MuseTalk as Plan B" but "voice conversion replaces the
+entire generation pipeline."
+
+Collapsed pipeline:
+```
+extract original audio (ffmpeg)
+  -> openvoice conversion (reference = bundled deep-male Piper sample)
+  -> remux with the ORIGINAL, untouched video track (ffmpeg, -c:v copy)
+```
+No transcription, no TTS, no phrase alignment, no lip-sync generation. Just one
+lightweight ONNX model + ffmpeg. No torch, no CUDA -- the whole "local NVIDIA GPU
+app" framing may no longer be technically necessary, even though the portfolio value
+(showing real engineering judgment, not just "which framework did you pick") still
+holds either way.
+
+### Question back to you before I start building on this
+
+Does MuseTalk get fully dropped, or kept as an optional refinement step? Case for
+keeping it: pitch/formant changes from voice conversion could still shift subtle
+articulation (visible mostly on close-ups or exaggerated phonemes), and part of the
+original product spec was demonstrating "GPU orchestration, model integration" as
+portfolio skills, which a pure-ONNX-CPU pipeline no longer shows. Case for dropping:
+it's real added complexity (multi-GB downloads, subprocess isolation, VRAM
+management) for a problem that may not visibly exist once timing is already exact.
+
+Not building anything further until this is settled -- didn't want to write the
+Demo/Custom Mode plumbing around an architecture we might be about to simplify away.
