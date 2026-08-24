@@ -142,3 +142,78 @@ looks too low, *before* downloading multiple GB of checkpoints.
    install friction, anything not showing up in docs?
 3. Agree with per-model venvs + subprocess boundary, or do you have a reason to prefer
    something else (conda envs, a single env with careful pinning, etc.)?
+
+
+---
+
+## From ChatGPT — 2026-08-24
+
+The proposal is sound, with one correction and one added validation gate.
+
+### Answers
+
+1. **MuseTalk output includes audio.** The current MuseTalk 1.5 application and
+   real-time inference scripts first encode the generated frames to a temporary MP4,
+   then attach the supplied audio using MoviePy or FFmpeg and emit a final MP4.
+   Nevertheless, keep the orchestrator's finalize stage: run `ffprobe` on MuseTalk's
+   result, verify that it contains one video and one audio stream with sensible
+   duration/start timestamps, and remux or normalize only when needed. Do not assume
+   every upstream inference path behaves identically.
+
+2. **OpenF5-TTS needs a stricter quality gate.** It is not a separate mature TTS
+   runtime; it is a community-trained checkpoint used through the official F5-TTS
+   code. Its model card labels it alpha, English-only, and explicitly says its current
+   quality and speaker similarity are inferior to the official noncommercial F5-TTS
+   weights. The checkpoint is also about 5.4GB. Therefore, do not design the product
+   around it until the actual sample passes a blind listening comparison for
+   intelligibility, naturalness, and target-speaker similarity. Also pin the exact
+   Hugging Face repository and commit SHA in the manifest rather than using a mutable
+   model name.
+
+3. **Agree with separate venvs and subprocess contracts.** This is the right Windows
+   architecture. Avoid a shared Torch environment, Conda, and Docker for the first
+   build. Make each worker accept explicit input/output paths and emit one final JSON
+   status object containing output path, duration, runtime, peak VRAM if measurable,
+   model revision, and error details. The orchestrator should never import either
+   model package.
+
+### Added Phase 0 decision gate
+
+Before installing the complete TTS + lip-sync pipeline, run a small comparison on the
+same 5–10 second source clip:
+
+- **Path A:** `voiceclonnx` speech-to-speech conversion using the original synchronized
+  audio plus a 10–30 second authorized reference voice.
+- **Path B:** OpenF5-TTS synthesis followed by MuseTalk 1.5.
+
+The voice-conversion path preserves the source timing and delivery and may make
+MuseTalk unnecessary or only an optional cleanup step. `voiceclonnx` is attractive
+for a spike because its wrapper is Apache 2.0, uses ONNX Runtime rather than PyTorch,
+and exposes several engines behind one API. However, verify the license of the exact
+downloaded engine weights separately; the wrapper license does not automatically
+cover every model.
+
+Compare both paths on:
+
+- intelligibility and word preservation;
+- target-speaker similarity;
+- naturalness and artifacts;
+- visible lip synchronization;
+- total runtime and peak VRAM;
+- checkpoint size and redistribution license;
+- Windows installation reliability.
+
+If Path A is acceptable and its selected weights are redistributable, use voice
+conversion as the primary demo pipeline. If not, proceed with Path B. This should be a
+manual spike only, with no UI or installer work until a winner is selected.
+
+### Minor implementation notes
+
+- MuseTalk recommends 25fps input because that matches its training data. Normalize a
+  working copy to 25fps, but preserve the original input untouched.
+- Use batch size 1 and FP16 initially for the 8GB laptop GPU.
+- Parse `nvidia-smi` before downloads, then verify CUDA again inside each model worker;
+  driver-supported CUDA 13.2 does not mean the worker must install a CUDA 13.2 Torch
+  build.
+- Keep SHA-256 verification and add model source, revision, license, and expected size
+  to the manifest.
