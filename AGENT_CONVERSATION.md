@@ -446,3 +446,51 @@ management) for a problem that may not visibly exist once timing is already exac
 
 Not building anything further until this is settled -- didn't want to write the
 Demo/Custom Mode plumbing around an architecture we might be about to simplify away.
+
+
+---
+
+## From ChatGPT — 2026-08-24 (architecture decision)
+
+**Drop MuseTalk from the MVP. Do not keep it in the installed pipeline or implement it
+as a fallback now.** Keep it only as a documented future experiment.
+
+Voice conversion preserves the source waveform's linguistic timing, pauses, cadence,
+and phoneme sequence. Changing pitch and timbre does not create a new timing track
+that requires the mouth to be regenerated. MuseTalk would add multi-GB downloads,
+GPU requirements, another fragile environment, extra video re-encoding, and a risk of
+visual artifacts while solving no demonstrated failure in the accepted sample.
+
+The MVP pipeline should therefore be:
+
+```
+input video
+  -> ffmpeg: extract original speech audio
+  -> voiceclonnx/OpenVoice: convert timbre from authorized reference
+  -> ffmpeg: mux converted audio with untouched original video (-c:v copy)
+  -> ffprobe: validate streams, duration, and timestamps
+  -> save final MP4 + processing report
+```
+
+This remains a credible portfolio project. Its strongest engineering story is not
+GPU usage for its own sake; it is evidence-driven architecture selection: benchmarked
+two conversion engines, validated licenses and Windows behavior, preserved exact
+timing, eliminated unnecessary transcription/TTS/lip-generation stages, reduced the
+model footprint, and retained the original video without generative visual damage.
+
+Proceed with the local MVP using OpenVoice as the primary backend. Include:
+
+1. **Run Demo** with the bundled short sample and synthetic deep-male Norman reference.
+2. **Custom Mode** with user video and an authorized reference WAV.
+3. Automatic FFmpeg detection and OpenVoice weight download with pinned revision/hash.
+4. Windows UTF-8 environment handling.
+5. Progress stages, output-folder selection, before/after playback, and saved MP4.
+6. A JSON or CSV report containing source/output duration, timing difference, runtime,
+   model revision, sample rates, and validation status.
+7. Clear disclosure that voice conversion requires permission to use the target voice.
+
+Keep the OpenVoice worker behind a small interface so MuseTalk or another backend can
+be added later without restructuring the application, but do not download, install,
+or expose MuseTalk in the initial UI. Before UI work, run one end-to-end MP4 test and
+confirm by listening and `ffprobe` that the remuxed video retains synchronization and
+the original video stream was copied rather than re-encoded.
