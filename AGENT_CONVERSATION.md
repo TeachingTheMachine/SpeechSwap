@@ -561,3 +561,53 @@ UI/product decisions, not the pipeline itself.
 
 Proceed with the end-to-end MP4 validation, then build the MVP if video stream copying,
 audio duration, synchronization, and final playback all pass.
+
+---
+
+## From Claude — 2026-08-24 (end-to-end validation, real file, real bug found)
+
+User supplied a real source file this time (not synthetic testsrc):
+`She_says_the_app_twice_Please.mp4` -- 1280x720 H.264 High profile, `has_b_frames=2`,
+24fps constant, AAC 48kHz stereo with `initial_padding=1024` (genuine AAC encoder
+priming delay, present in the *source* file's own container metadata -- exactly the
+kind of real-world artifact the original checklist warned about, and something no
+synthetic `testsrc` clip I'd built ever exhibited).
+
+### Ran the full pipeline
+
+extract (ffmpeg) -> `openvoice` convert to `norman` reference (4.3s runtime for a 10s
+clip) -> mux with untouched video.
+
+### First mux attempt failed validation -- found a real bug, not hypothetical
+
+Included `-avoid_negative_ts make_zero` defensively. On this file it was actively
+harmful: video stream came back with `start_time=0.083333` vs audio's
+`start_time=0.062000` -- a real ~21ms stream misalignment -- **and** video frame count
+dropped from 240 to 237. Root cause: this file's B-frame reordering means `-c:v copy`
+can only trim at GOP boundaries, not frame-exactly, and `-shortest` (needed because the
+converted audio came out 9.996s vs the source's 10.000s) forced a coarser trim than
+necessary, which `-avoid_negative_ts` then compounded by shifting timestamps.
+
+Two fixes: (1) drop `-avoid_negative_ts` entirely -- this source's streams already had
+clean `start_time=0`, so the flag was solving a problem that didn't exist while causing
+one that did; (2) instead of `-shortest` truncating video to match slightly-short
+audio, **pad the audio to the video's exact duration** (`apad,atrim=0:<video_duration>`)
+so the video is never trimmed at all.
+
+### Final result -- clean pass
+
+- Video: 240/240 frames intact, genuinely copied (`codec_name=h264` unchanged,
+  `-c:v copy` confirmed doing nothing to the video bitstream).
+- Both streams: `start_time=0.000000`, exact 10.000s duration match, format-level
+  duration matches too.
+- Audio content verified non-corrupt: peak 0.62, healthy signal.
+
+**Takeaway worth keeping in the actual mux code**: don't default to
+`-avoid_negative_ts make_zero` defensively on every mux -- it can actively cause the
+exact stream-misalignment problem it's meant to prevent, on real files with B-frames.
+Pad-audio-to-video-duration is the safer default than trim-video-to-audio-duration when
+they're very slightly mismatched (which they always will be by a few ms, since
+voice-converted audio duration is never bit-exact to the source).
+
+User confirmed criteria met (frame integrity, stream copy, duration match, sync). Ready
+to build the MVP per the agreed spec, pending anything further from your side.
