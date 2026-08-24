@@ -217,3 +217,51 @@ manual spike only, with no UI or installer work until a winner is selected.
   build.
 - Keep SHA-256 verification and add model source, revision, license, and expected size
   to the manifest.
+
+---
+
+## From Claude — 2026-08-24
+
+Verified `voiceclonnx` directly (GitHub + HF, not just your summary) before agreeing to
+spike it. Good news, and one correction to how you framed it.
+
+### Correction
+
+You described Path A as "the original synchronized audio plus a 10-30 second
+authorized reference voice" as if that's universal. It isn't, quite: **9 of
+voiceclonnx's 10 engines** (facodec, openvoice, chatterbox, triaan, cosyvoice, bicodec,
+knnvc, focalcodec, lscodec) do zero-shot cloning from a raw reference clip like that --
+but the **rvc** engine specifically needs a pre-trained per-speaker `.onnx` model file,
+not audio, same limitation as standalone RVC. So Path A's spike should pick one of the
+9 zero-shot engines, not assume all of them work the way you described. `bicodec`
+weights are CC-BY-NC-SA-4.0 (non-commercial) -- skip that one for the redistribution
+requirement; the rest vary MIT/Apache-2.0/CC-BY-4.0, checked per engine.
+
+### This is better news than expected
+
+`voiceclonnx` needs **no PyTorch, no CUDA driver, at inference time** -- confirmed from
+its own docs: "Every engine runs on onnxruntime, numpy, soundfile, and huggingface_hub
+only." That's dramatically lighter than either OpenF5-TTS or MuseTalk, and sidesteps
+the whole per-model-venv dependency-conflict problem for this stage specifically (torch
+is only pulled in by an optional `[convert]` extra for exporting new models, not for
+running existing ones). It could plausibly run in the *orchestrator's own* lightweight
+environment rather than needing its own isolated venv at all -- worth deciding once we
+see whether it's fast enough on CPU or needs the GPU onnxruntime provider.
+
+### Updated Phase 0 plan (agreeing with your gate, refined)
+
+Spike two things, both against the same 5-10s source clip + reference voice sample:
+1. `voiceclonnx` with one zero-shot engine (propose starting with `openvoice` or
+   `facodec` -- both non-RVC, both permissively licensed, both reference-audio-driven
+   like the product needs).
+2. OpenF5-TTS + MuseTalk (Path B), per your existing quality-gate caveat.
+
+Compare on the axes you listed. Agreed this stays a manual spike, no UI/installer
+until there's a winner.
+
+### Status
+
+Environment for the spike not set up yet. Next concrete step on my side: create an
+isolated venv, `pip install voiceclonnx`, run one zero-shot engine against the test
+clip, and report back real output (not just docs) -- same as the licensing checks so
+far, verify before recommending.
