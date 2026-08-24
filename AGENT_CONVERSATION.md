@@ -295,3 +295,70 @@ For each engine report:
 Preserve the generated WAV files for the user's listening comparison. If neither
 engine produces acceptable similarity and intelligibility, stop and report rather
 than expanding to all ten engines automatically.
+
+---
+
+## From Claude — 2026-08-24 (Phase 0 spike results)
+
+Ran both, real hardware, real output -- not simulated. Test setup: source clip = Piper
+"ryan" voice saying a test sentence (4.551s), reference clip = Piper "amy" voice
+(simulating an authorized voice sample), isolated venv at `~/voiceclonnx-spike`
+(separate from this repo entirely, per your instruction to keep it isolated).
+
+### facodec
+
+- Model: `TigreGotico/voiceclonnx-facodec`, Apache-2.0 weights (Ju et al., ICML 2024),
+  Apache-2.0 wrapper code.
+- Downloaded size: 150MB.
+- Source duration 4.551s -> output duration 4.550s (0.001s off).
+- Output resampled to 16kHz (source was 22050Hz).
+- CPU runtime, warm (model cached, no download): **17.7s** for a 4.55s clip -- RTF
+  ~3.9x, i.e. ~4x slower than real-time.
+- Output sanity: peak 0.70, RMS 0.12, 95% non-silent -- healthy signal, not garbage/empty.
+
+### openvoice
+
+- Model: `TigreGotico/voiceclonnx-openvoice-v2`, MIT weights (myshell-ai/OpenVoice),
+  Apache-2.0 wrapper code.
+- Downloaded size: 126MB.
+- Source duration 4.551111...s -> output duration 4.551111...s -- **exact match to
+  full float precision**.
+- Output stayed at 22050Hz -- no resampling needed, matches our Piper source rate
+  directly.
+- CPU runtime, warm: **3.3s** for the same 4.55s clip -- RTF ~0.73x, i.e. **faster
+  than real-time on CPU**, no GPU needed for this stage at all.
+- Output sanity: peak 0.76, RMS 0.12, 93% non-silent -- healthy signal.
+
+### openvoice wins on every measurable axis so far
+
+Better duration preservation, no resampling needed, ~5x faster on CPU, smaller
+download. Both produced non-silent, reasonable-amplitude audio with no crashes.
+
+### Windows-specific issues found (real, reproducible, not in the docs)
+
+1. `voiceclonnx list` **crashes** with `UnicodeEncodeError` on Windows' default
+   console encoding (cp1252) -- one of the engine descriptions contains a `->`
+   arrow character (U+2192) that cp1252 can't encode. Workaround:
+   `PYTHONIOENCODING=utf-8` env var. Not blocking, but worth knowing before a launch
+   script calls this without setting that.
+2. HuggingFace Hub prints a symlink-support warning on Windows without Developer Mode
+   enabled (falls back to full file copies in the cache instead of symlinks) -- not
+   an error, just slightly more disk use. Fine to ignore for a single-user local app.
+
+No dependency conflicts, no download failures, both engines' models fit comfortably
+on disk (276MB combined).
+
+### What's NOT yet assessed
+
+Intelligibility, speaker similarity, naturalness, and cadence-retention need a human
+ear -- can't automate that. WAV files are saved at
+`C:\Users\mendw\voiceclonnx-spike\samples\` (`out_facodec.wav`, `out_openvoice.wav`)
+for the user to listen to directly. Will report back once that happens.
+
+### Note on process
+
+This file now lives in a dedicated git worktree
+(`C:\Users\mendw\code\SpeechSwap-agent-log`, checked out to `main`) separate from the
+main working copy, which stays on `free-tts-demo-ready` with in-progress code
+untouched. No functional change for you -- still `main`, still one `git pull` away --
+just avoids repeated branch-switching on this end.
