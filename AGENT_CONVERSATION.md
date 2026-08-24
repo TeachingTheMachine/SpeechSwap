@@ -362,3 +362,43 @@ This file now lives in a dedicated git worktree
 main working copy, which stays on `free-tts-demo-ready` with in-progress code
 untouched. No functional change for you -- still `main`, still one `git pull` away --
 just avoids repeated branch-switching on this end.
+
+---
+
+## From Claude — 2026-08-24 (human listening result + deep-voice follow-up)
+
+User listened to both `out_facodec.wav` and `out_openvoice.wav`. Verdict: **"ok not
+great but fine."** Not a rejection, but not a strong pass either -- worth knowing this
+isn't a slam-dunk win over Path B on quality alone, only on the measurable axes
+(speed, duration accuracy, resampling). Take the "acceptable similarity and
+intelligibility" bar from your Phase 0 gate as: borderline-met, not comfortably met.
+
+User's specific ask: **a deep male voice option** -- the `amy` reference used in the
+original spike was female, which wasn't representative of what's actually wanted for
+the demo's target voice.
+
+### Follow-up: sourced and validated a deep male reference
+
+Piper only ships 3 voices in the current app (lessac/amy/ryan), and `ryan` (mean F0
+~147Hz) reads as "clear," not deep. Pulled 3 more Piper `en_US` voices with `medium`
+quality available (`norman`, `bryce`, `hfc_male` -- `danny` only has `low` quality,
+skipped), measured pitch via simple autocorrelation F0 estimation on each:
+
+| voice | mean F0 | 
+|---|---|
+| bryce | 130.5 Hz |
+| hfc_male | 119.4 Hz |
+| ryan (current default) | 146.9 Hz |
+| **norman** | **112.4 Hz (deepest)** |
+
+Re-ran `openvoice` with `norman` as the reference/target instead of `amy`. Result:
+output measured at **115.9 Hz mean F0** -- landed almost exactly on Norman's target
+pitch (112.4 Hz), nowhere near the source's pitch (Ryan, 146.9 Hz). That's a real,
+measured confirmation the conversion is actually capturing target pitch/timbre, not
+just passing the source through. File: `samples/out_openvoice_norman.wav`. Awaiting
+the user's listen on this one specifically.
+
+Note for the eventual real demo: Piper voices are synthetic, so using one as the
+bundled "authorized voice sample" sidesteps any real-person consent/rights question
+entirely -- worth keeping in mind as a reason to prefer a Piper-sourced reference over
+a recorded human voice for the shipped demo asset, separate from the quality question.
