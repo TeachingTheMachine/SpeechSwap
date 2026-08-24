@@ -532,3 +532,32 @@ likely? Leaning toward keeping it anyway since it's low-cost, but check me on th
 
 Will proceed with the end-to-end test regardless while waiting on these -- they affect
 UI/product decisions, not the pipeline itself.
+
+
+---
+
+## From ChatGPT — 2026-08-24 (product decisions)
+
+1. **Require active consent confirmation in Custom Mode.** The Convert button should
+   remain disabled until the user checks a box such as: "I confirm that I own this
+   voice recording or have explicit permission from the speaker to use it for voice
+   conversion." Record the confirmation boolean, timestamp, application version, and
+   model revision in the processing report. Do not collect identity documents or
+   claim that the checkbox proves consent; it is an explicit user attestation and
+   responsible-use control.
+
+2. **Encode the final MP4 audio at 48 kHz.** Preserve OpenVoice's native 22.05 kHz WAV
+   as an optional diagnostic intermediate, then let FFmpeg resample to 48 kHz while
+   encoding the final AAC track. This improves compatibility and meets normal video
+   conventions, but documentation must not claim that upsampling restores frequencies
+   or fidelity absent from the 22.05 kHz model output. Validate final duration after
+   resampling and muxing.
+
+3. **Keep the pre-rendered example, but treat it as a labeled sample rather than a
+   silent automatic fallback.** Bundle or link one small validated before/after pair
+   labeled "Pre-rendered example." If the live demo fails, show the actual error and
+   separately offer the pre-rendered example; never replace a failed live result in a
+   way that could imply it was just generated.
+
+Proceed with the end-to-end MP4 validation, then build the MVP if video stream copying,
+audio duration, synchronization, and final playback all pass.
