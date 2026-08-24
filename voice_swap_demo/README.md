@@ -83,6 +83,31 @@ ELEVENLABS_API_KEY=your_key_here
 choose "ElevenLabs (paid, your API key)" as the voice source, click "Load my
 ElevenLabs voices," and pick one.
 
+## Hosting a public demo (Streamlit Community Cloud)
+
+The free `openvoice` engine is CPU-only and runs faster than real time, so this app
+can run on Streamlit Community Cloud's free tier with no code changes beyond one
+config flag:
+
+1. On [share.streamlit.io](https://share.streamlit.io), deploy this repo with
+   **main file path** set to `voice_swap_demo/app.py`. Streamlit Cloud reads
+   `requirements.txt` and `packages.txt` (installs `ffmpeg` via apt) from the same
+   folder as the app file automatically.
+2. In the app's **Secrets**, set:
+   ```
+   SPEECHSWAP_HOSTED_DEMO = "1"
+   ```
+   This hides Custom Mode on the hosted instance -- anonymous visitors get the real,
+   live Run Demo (pick any bundled voice, run the actual pipeline), but can't upload
+   arbitrary video/audio to a shared, unmoderated public server. Custom Mode still
+   works in the local download.
+3. Do **not** set `ELEVENLABS_API_KEY` as a secret here. Leaving it unset means
+   every visitor brings their own key if they want that path locally -- nothing
+   about the hosted deploy should spend your API credits.
+4. The voice-conversion model (~130MB) downloads automatically on first cold start
+   (see `_ensure_checkpoint()` in `app.py`) -- no separate setup step needed on
+   Streamlit Cloud, unlike the local `setup.bat` flow.
+
 ## Limitations (v1, by design)
 
 - Works best on short clips with one clearly audible speaker.
