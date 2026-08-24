@@ -90,9 +90,13 @@ can run on Streamlit Community Cloud's free tier with no code changes beyond one
 config flag:
 
 1. On [share.streamlit.io](https://share.streamlit.io), deploy this repo with
-   **main file path** set to `voice_swap_demo/app.py`. Streamlit Cloud reads
-   `requirements.txt` and `packages.txt` (installs `ffmpeg` via apt) from the same
-   folder as the app file automatically.
+   **main file path** set to `voice_swap_demo/app.py`. Streamlit Cloud walks up from
+   the app file to find `requirements.txt` (this one, in `voice_swap_demo/`, gets
+   picked up automatically) -- but **not** for `packages.txt` (apt-level system
+   packages, here `ffmpeg` and `libgomp1`, the latter required for `onnxruntime` to
+   import on Linux). That file has to live at the **repo root**, a current Community
+   Cloud limitation, not something this project chose --
+   see [streamlit/streamlit#9756](https://github.com/streamlit/streamlit/issues/9756).
 2. In the app's **Secrets**, set:
    ```
    SPEECHSWAP_HOSTED_DEMO = "1"
