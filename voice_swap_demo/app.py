@@ -6,12 +6,32 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import streamlit as st
-from dotenv import load_dotenv
 
-from checkpoint_manager import download_and_verify, is_verified
-from elevenlabs_engine import ElevenLabsError, list_voices
-from pipeline import convert_video, ENGINE_ELEVENLABS, ENGINE_OPENVOICE, PipelineError, _sanitize_working_name
-from report import build_report, write_report
+st.set_page_config(page_title="SpeechSwap Voice Conversion", page_icon="🎙️", layout="wide")
+
+# Disable HF Hub's Xet acceleration backend (hf-xet) before huggingface_hub is
+# imported anywhere below. We only ever fetch two small ONNX files, so we don't
+# need Xet's large-file chunked-transfer performance -- and hf-xet is a young,
+# separately-versioned native (Rust) extension with reported platform-specific
+# instability. Set as an env var, not a pip constraint, since huggingface_hub
+# reads this to decide whether to even attempt loading the xet backend.
+os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
+
+try:
+    from dotenv import load_dotenv
+
+    from checkpoint_manager import download_and_verify, is_verified
+    from elevenlabs_engine import ElevenLabsError, list_voices
+    from pipeline import convert_video, ENGINE_ELEVENLABS, ENGINE_OPENVOICE, PipelineError, _sanitize_working_name
+    from report import build_report, write_report
+except Exception:
+    # A catchable import-time failure (missing shared library, incompatible
+    # native extension, etc.) would otherwise kill the process before Streamlit
+    # ever renders anything, showing up only as a silent health-check failure
+    # in the deploy log with no traceback. Surface it in the app itself instead.
+    st.error("The app failed to start due to an import error:")
+    st.code(traceback.format_exc())
+    st.stop()
 
 APP_DIR = Path(__file__).parent
 ASSETS_DIR = APP_DIR / "assets"
@@ -39,8 +59,6 @@ VOICE_OPTIONS = {
     "hfc_female": ("HFC Female -- Young / bright female", "demo_reference_hfc_female.wav"),
     "lessac": ("Lessac -- Neutral", "demo_reference_lessac.wav"),
 }
-
-st.set_page_config(page_title="SpeechSwap Voice Conversion", page_icon="🎙️", layout="wide")
 
 for key, default in [
     ("demo_result", None), ("demo_report", None),
