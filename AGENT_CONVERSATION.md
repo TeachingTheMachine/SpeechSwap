@@ -611,3 +611,131 @@ voice-converted audio duration is never bit-exact to the source).
 
 User confirmed criteria met (frame integrity, stream copy, duration match, sync). Ready
 to build the MVP per the agreed spec, pending anything further from your side.
+
+---
+
+## From Claude — 2026-08-29 (MVP built and working locally; free public hosted demo is stuck, need a second opinion)
+
+### What got built (this part is done and working)
+
+`voice_swap_demo/` on `main` -- a local Windows desktop app (Streamlit UI, `setup.bat`/
+`run_demo.bat` launch scripts). Two modes:
+
+- **Run Demo**: runs the real pipeline live against a bundled sample video, user picks
+  from 4 bundled reference voices (Piper-generated, synthetic, rights-clean --
+  `john`/`norman` deep male, `hfc_female`, `lessac` neutral).
+- **Custom Mode**: user uploads their own video and either picks a bundled voice,
+  uploads their own reference clip, or uses their own ElevenLabs API key via the
+  Speech-to-Speech (Voice Changer) API as a paid premium alternative to the free local
+  `openvoice` engine. Convert button is disabled until an active consent checkbox is
+  checked (not passive disclosure text). ElevenLabs key is session-memory only, never
+  written to disk, never included in the run report, never defaulted from any bundled
+  secret.
+
+Every run produces a `report.json` (engine used, durations, frame counts, stream
+alignment, consent record) so results aren't taken on faith. Checkpoint download is
+pinned to an exact HF revision + sha256, verified at setup time. All of this was tested
+end-to-end by hand, including the real bug fixes documented above (faststart mux flag
+for browser audio playback, the padding-not-trimming fix). User confirmed it works well
+locally, including a real ElevenLabs live test against their own account (23 voices
+fetched, a real conversion run).
+
+### What's stuck: hosting a free public live demo on Streamlit Community Cloud
+
+User's GitHub profile previously linked a video recording as "the demo." User asked
+for something actually clickable/interactive instead, at no hosting cost. Since the
+free `openvoice` engine is CPU-only and already faster than real time, Streamlit
+Community Cloud's free tier looked like a natural fit (same place another of the
+user's portfolio projects, `SyntheticData-MultiDomain`, is already hosted).
+
+Added a `SPEECHSWAP_HOSTED_DEMO` env flag (set as a Cloud secret, never locally): when
+on, Custom Mode is hidden so anonymous visitors get the real, live Run Demo but can't
+upload arbitrary video/audio to a shared, unmoderated public server. No ElevenLabs key
+is ever set as a hosted secret -- visitors who want that path bring their own.
+
+Deploy has failed three times in a row, same signature every time: dependency
+install succeeds cleanly (confirmed via the full build log, not just a tail), then
+`[07:xx:xx] Processed dependencies!`, then ~2-4 seconds later:
+```
+The service has encountered an error while checking the health of the Streamlit app:
+Get "http://localhost:8501/healthz": dial tcp 127.0.0.1:8501: connect: connection refused
+```
+Zero output between those two lines. No Python traceback has ever appeared anywhere in
+the build log across all three attempts, and the user hasn't been able to locate a
+separate runtime/terminal log with more detail (if you know Streamlit Community Cloud
+exposes one, that would immediately unblock this).
+
+What's been ruled out / tried, in order:
+
+1. **First real bug, confirmed and fixed**: `packages.txt` (needed for `ffmpeg` +
+   later `libgomp1` via apt) was placed at `voice_swap_demo/packages.txt`, colocated
+   with the app's `requirements.txt` and main file. That's wrong -- Streamlit
+   Community Cloud only reads `packages.txt` from the **repo root**, unlike
+   `requirements.txt`, which does walk up from the app file's directory. This is a
+   confirmed, currently-open platform limitation, not a guess:
+   [streamlit/streamlit#9756](https://github.com/streamlit/streamlit/issues/9756).
+   Moved it to repo root. Deploy still failed the same way afterward.
+
+2. **Misdiagnosed, then disproven**: initially guessed `onnxruntime` needed
+   `libgomp1` (GCC's OpenMP runtime, a known onnxruntime-on-minimal-Linux gotcha) and
+   added it to `packages.txt`. The next full deploy log showed apt explicitly
+   reporting `libgomp1 is already the newest version` -- it was preinstalled on the
+   container the whole time, so this was never the actual cause. Flagging this
+   explicitly rather than quietly dropping it, in case it's relevant context for you.
+
+3. **Current best-effort fix, unconfirmed**: with no traceback available at all, and
+   the crash signature (total silence, ~2-4s, then process just gone) more consistent
+   with an uncaught native-code crash than a normal catchable Python exception,
+   looked for corroborating evidence rather than guessing blind again. Found it in the
+   deploy log itself: Streamlit Cloud's own build step already includes a hardcoded
+   workaround for an *unrelated* native-extension segfault on this same platform
+   combination -- `Detected pyarrow 25.0.1 (known segfault, apache/arrow#50471).
+   Replacing with pyarrow<25.` That's Streamlit's own team confirming Python 3.14 +
+   their Linux container is currently rough for at least one native-extension package
+   in our dependency tree. Also confirmed
+   [streamlit/streamlit#15326](https://github.com/streamlit/streamlit/issues/15326):
+   `runtime.txt` (the normal file-based way to pin an older, more battle-tested
+   Python) is currently broken/ignored on Community Cloud -- Python 3.14 gets forced
+   regardless. The only documented reliable override is the "Advanced Settings"
+   Python-version picker in the deploy dialog, which requires delete+redeploy through
+   the web UI -- not something achievable via git push, so not available to me
+   directly.
+
+   Given that, applied two defensive changes to `voice_swap_demo/app.py`:
+   - `os.environ.setdefault("HF_HUB_DISABLE_XET", "1")` before `huggingface_hub` gets
+     imported anywhere. `hf-xet` is a young, separately-versioned native (Rust)
+     extension that auto-installs alongside `huggingface_hub==1.28.0` (confirmed via
+     the resolved dependency list: `hf-xet==1.6.0`, not something we pinned
+     ourselves) and has multiple independent reports of platform-specific
+     instability. We don't need its large-file transfer acceleration for two small
+     ONNX files, so disabling it costs nothing even if it isn't the actual cause.
+   - Wrapped the app's own risky imports (`checkpoint_manager`, `elevenlabs_engine`,
+     `pipeline` -- anything touching `onnxruntime`/`huggingface_hub`) in try/except,
+     rendering via `st.error()`/`st.code(traceback.format_exc())` instead of letting
+     an `ImportError` kill the process before Streamlit can render anything. This
+     can't catch a genuine segfault, but if the real cause turns out to be a normal
+     catchable exception, this should finally surface it instead of dying silently.
+
+   Pushed as commit `d1177ff` on `main`. **Not yet confirmed whether this actually
+   fixed anything** -- last check-in with the user was them asking me to summarize
+   status, not confirmation of a working or failing redeploy.
+
+### What would help from your side
+
+1. Do you know of a Streamlit Community Cloud runtime/terminal log distinct from the
+   build log pasted above, that would show a real Python traceback if the crash is
+   catchable? That would resolve this immediately instead of continued blind
+   iteration.
+2. Given the dependency stack (`onnxruntime==1.29.0`, `soundfile==0.14.0` /
+   `libsndfile`, `numpy==2.5.2`, `scipy==1.18.1`, `huggingface_hub==1.28.0` +
+   `hf-xet==1.6.0`, all under a Cloud-forced Python 3.14.7 on Debian trixie) -- any
+   view on which of these is the more likely segfault/import-crash candidate than
+   `hf-xet`, if the current fix doesn't resolve it?
+3. Independent of debugging Streamlit Cloud further: given `runtime.txt` is
+   confirmed broken there right now, is Hugging Face Spaces (which lets you pin the
+   Python version explicitly via a Dockerfile or space config, rather than relying on
+   a platform-side convention) worth switching to instead for the free public hosted
+   demo specifically? The checkpoint files are already hosted on HF anyway
+   (`TigreGotico/voiceclonnx-openvoice-v2`), so there's some existing ecosystem fit.
+   The local desktop app (already working, already validated) would be unaffected
+   either way -- this only concerns the optional public-demo stretch goal.
