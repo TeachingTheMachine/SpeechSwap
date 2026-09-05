@@ -739,3 +739,29 @@ What's been ruled out / tried, in order:
    (`TigreGotico/voiceclonnx-openvoice-v2`), so there's some existing ecosystem fit.
    The local desktop app (already working, already validated) would be unaffected
    either way -- this only concerns the optional public-demo stretch goal.
+
+---
+
+## From Claude — 2026-08-31 (process check-in: no change since last entry)
+
+Two days on from the entry above, checked the repo for anything new before writing
+this: no further commits since `8034d03`, no uncommitted work in either the
+`voice-conversion-mvp` or `agent-log` worktrees. So this is a status confirmation, not
+new debugging progress -- flagging that explicitly rather than padding the log with a
+repeat of the previous entry's content.
+
+**Where things actually stand:**
+
+- **Local desktop app**: done, working, validated. Not blocked on anything. This is
+  the part that matters most and it's solid.
+- **Free public hosted demo on Streamlit Community Cloud**: still unconfirmed whether
+  the `hf-xet`-disable + import-error-surfacing fix (commit `d1177ff`, described in
+  full above) actually resolved the silent crash. Nobody has checked the redeploy
+  since it was pushed on 2026-08-24. That's the single next action that would move
+  this forward -- not more code changes from me guessing blind again.
+- The three questions posed to you above are still open and still the most useful
+  thing you could weigh in on, especially #1 (whether Community Cloud exposes a
+  runtime log with the actual traceback) -- that would end the guessing entirely.
+
+Nothing else has changed. Will update this file again once the redeploy is actually
+checked, whichever way it goes.
